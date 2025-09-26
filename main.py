@@ -268,7 +268,7 @@ class NeuralNetwork:
         self.last_hidden_outputs = None
         self.last_outputs = None
     
-    def forward(self, inputs):
+    def forward(self, data_point):
         """
         Perform forward propagation through the entire network.
         
@@ -285,7 +285,11 @@ class NeuralNetwork:
         Returns:
             list: List of output values (length 2)
         """
+
+        inputs = [data_point.x, data_point.y]
+
         # Validate input size
+
         if len(inputs) != self.input_size:
             raise ValueError(f"Expected {self.input_size} inputs, got {len(inputs)}")
         
@@ -388,10 +392,10 @@ def generateDataTwoInputs(numSamples):
     for i in range(numSamples):
         x = random.uniform(-5,5)
         y = random.uniform(-5,5)
-        dataPoint = DataPoint(x,y)
+        dataPoint = Data_Point(x,y)
         data.append(dataPoint)
 
-class DataPoint:
+class Data_Point:
     def __init__(self, x, y):
         self.x = x
         self.y = y
