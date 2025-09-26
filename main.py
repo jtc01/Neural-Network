@@ -1,4 +1,5 @@
 import math
+import random
 
 class Neuron:
     """
@@ -379,3 +380,32 @@ class NeuralNetwork:
             weights = [round(w, 3) for w in self.output_layer[i].weights]
             bias = round(self.output_layer[i].bias, 3)
             print(f"  Neuron {i+1}: W={weights}, b={bias}")
+
+
+
+def generateDataTwoInputs(numSamples):
+    data=[]
+    for i in range(numSamples):
+        x = random.uniform(-5,5)
+        y = random.uniform(-5,5)
+        dataPoint = DataPoint(x,y)
+        data.append(dataPoint)
+
+class DataPoint:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        if y<-x**4-x**3+3*x**2+2*x+4 and y>x**4/5-x**3+x/2:
+            self.t=1
+            self.f=0
+        else:
+            self.t=0
+            self.f=1
+
+def main():
+    return 0
+
+"""
+Journal
+9/26 Making a map wasn't actually that useful for the neuron
+"""
