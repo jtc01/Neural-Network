@@ -206,17 +206,19 @@ class Neuron:
 
 class NeuralNetwork:
     """
-    A simple feedforward neural network with one hidden layer.
+    A flexible feedforward neural network with variable architecture.
     
-    Architecture: 2 inputs -> 2 hidden neurons -> 2 outputs
+    Architecture: input_size -> hidden_layers -> output_size
+    Example: input_size=2, hidden_layers=[3,4,2], output_size=2 creates:
+    2 inputs -> 3 hidden neurons -> 4 hidden neurons -> 2 hidden neurons -> 2 outputs
     
     This network performs forward propagation through the layers:
     1. Input layer receives the input data
-    2. Hidden layer processes inputs through neurons with weights and biases
+    2. Multiple hidden layers process data sequentially
     3. Output layer produces final predictions
     """
     
-    def __init__(self, hidden_activation='sigmoid', output_activation='sigmoid', random_seed=None):
+    def __init__(self, hidden_layers, input_size=2, output_size=2, hidden_activation='sigmoid', output_activation='sigmoid', random_seed=None):
         """
         Initialize the neural network with random weights and biases.
         
@@ -229,46 +231,59 @@ class NeuralNetwork:
         if random_seed is not None:
             random.seed(random_seed)
         
-        # Network architecture parameters
-        self.input_size = 2
-        self.hidden_size = 2
-        self.output_size = 2
+        # Store variable architecture parameters
+        self.input_size = input_size
+        self.hidden_layers_sizes = hidden_layers.copy()  # Store the architecture
+        self.output_size = output_size
+        self.num_hidden_layers = len(hidden_layers)
         
         # Store activation function types
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
         
-        # Initialize the hidden layer (2 neurons, each taking 2 inputs)
-        self.hidden_layer = []
-        for i in range(self.hidden_size):
-            # Generate random weights for connections from input layer to this hidden neuron
-            # Weights are initialized between -1 and 1
-            weights = [random.uniform(-1, 1) for _ in range(self.input_size)]
-            # Generate random bias between -1 and 1
-            bias = random.uniform(-1, 1)
-            # Create the hidden neuron
-            neuron = Neuron(weights=weights, bias=bias, activation_function=hidden_activation)
-            self.hidden_layer.append(neuron)
-            print(f"Hidden neuron {i+1}: weights={[round(w, 3) for w in weights]}, bias={round(bias, 3)}")
+         # Initialize variable number of hidden layers
+        self.hidden_layers = []  # This will be a list of lists (layers of neurons)
         
-        # Initialize the output layer (2 neurons, each taking 2 inputs from hidden layer)
+        # Create each hidden layer
+        for layer_idx, layer_size in enumerate(hidden_layers):
+            layer_neurons = []
+            
+            # Determine input size for this layer
+            if layer_idx == 0:
+                # First hidden layer takes inputs from input layer
+                input_connections = self.input_size
+            else:
+                # Subsequent hidden layers take inputs from previous hidden layer
+                input_connections = hidden_layers[layer_idx - 1]
+            
+            # Create neurons for this layer
+            for neuron_idx in range(layer_size):
+                # Generate random weights for connections to this neuron
+                weights = [random.uniform(-1, 1) for _ in range(input_connections)]
+                bias = random.uniform(-1, 1)
+                neuron = Neuron(weights=weights, bias=bias, activation_function=hidden_activation)
+                layer_neurons.append(neuron)
+                print(f"Hidden Layer {layer_idx+1}, Neuron {neuron_idx+1}: weights={[round(w, 3) for w in weights]}, bias={round(bias, 3)}")
+        
+            self.hidden_layers.append(layer_neurons)
+        
         self.output_layer = []
+        last_hidden_size = hidden_layers[-1] if hidden_layers else self.input_size
+    
         for i in range(self.output_size):
-            # Generate random weights for connections from hidden layer to this output neuron
-            weights = [random.uniform(-1, 1) for _ in range(self.hidden_size)]
-            # Generate random bias between -1 and 1
+            weights = [random.uniform(-1, 1) for _ in range(last_hidden_size)]
             bias = random.uniform(-1, 1)
             # Create the output neuron
             neuron = Neuron(weights=weights, bias=bias, activation_function=output_activation)
             self.output_layer.append(neuron)
             print(f"Output neuron {i+1}: weights={[round(w, 3) for w in weights]}, bias={round(bias, 3)}")
-        
-        # Store intermediate values for debugging and visualization
-        self.last_inputs = None
-        self.last_hidden_outputs = None
-        self.last_outputs = None
+            
+            # Store intermediate values for debugging and visualization
+            self.last_inputs = None
+            self.last_hidden_outputs = []
+            self.last_outputs = None
     
-    def forward(self, data_point):
+    def forward(self, inputs):
         """
         Perform forward propagation through the entire network.
         
@@ -286,7 +301,7 @@ class NeuralNetwork:
             list: List of output values (length 2)
         """
 
-        inputs = [data_point.x, data_point.y]
+        inputs = []
 
         # Validate input size
 
@@ -296,21 +311,29 @@ class NeuralNetwork:
         # Store inputs for debugging
         self.last_inputs = inputs.copy()
         
-        # Step 1: Forward pass through hidden layer
-        # Each hidden neuron processes the same input data
-        hidden_outputs = []
-        for i, neuron in enumerate(self.hidden_layer):
-            output = neuron.forward(inputs)
-            hidden_outputs.append(output)
+        # Step 1: Forward pass through all hidden layers sequentially
+        current_inputs = inputs
+        self.last_hidden_outputs = []  # Reset hidden outputs storage
         
-        # Store hidden layer outputs for debugging
-        self.last_hidden_outputs = hidden_outputs.copy()
+        for layer_idx, layer in enumerate(self.hidden_layers):
+            layer_outputs = []
+            
+            # Process current inputs through each neuron in this layer
+            for neuron in layer:
+                output = neuron.forward(current_inputs)
+                layer_outputs.append(output)
+            
+            # Store this layer's outputs for debugging
+            self.last_hidden_outputs.append(layer_outputs.copy())
+        
+            # The outputs of this layer become inputs to the next layer
+            current_inputs = layer_outputs
         
         # Step 2: Forward pass through output layer
         # Each output neuron takes the hidden layer outputs as inputs
         final_outputs = []
-        for i, neuron in enumerate(self.output_layer):
-            output = neuron.forward(hidden_outputs)
+        for neuron in self.output_layer:
+            output = neuron.forward(current_inputs)
             final_outputs.append(output)
         
         # Store final outputs for debugging
@@ -325,26 +348,39 @@ class NeuralNetwork:
         Returns:
             dict: Dictionary containing network information
         """
+        # CHANGE: Create architecture string for variable layers
+        arch_parts = [str(self.input_size)]
+        arch_parts.extend([str(size) for size in self.hidden_layers_sizes])
+        arch_parts.append(str(self.output_size))
+        architecture_string = "-".join(arch_parts)
+        
         info = {
-            'architecture': f"{self.input_size}-{self.hidden_size}-{self.output_size}",
+            'architecture': architecture_string,
+            'hidden_layers_sizes': self.hidden_layers_sizes,
+            'num_hidden_layers': self.num_hidden_layers,
             'hidden_activation': self.hidden_activation,
             'output_activation': self.output_activation,
             'last_inputs': self.last_inputs,
             'last_hidden_outputs': self.last_hidden_outputs,
             'last_outputs': self.last_outputs,
-            'hidden_layer_weights': [],
-            'hidden_layer_biases': [],
+            'hidden_layers_weights': [],  # CHANGE: Now a list of lists
+            'hidden_layers_biases': [],   # CHANGE: Now a list of lists
             'output_layer_weights': [],
             'output_layer_biases': []
         }
         
-        # Collect hidden layer parameters
-        for i, neuron in enumerate(self.hidden_layer):
-            info['hidden_layer_weights'].append(neuron.weights)
-            info['hidden_layer_biases'].append(neuron.bias)
+        # CHANGE: Collect parameters from all hidden layers
+        for layer_idx, layer in enumerate(self.hidden_layers):
+            layer_weights = []
+            layer_biases = []
+            for neuron in layer:
+                layer_weights.append(neuron.weights)
+                layer_biases.append(neuron.bias)
+            info['hidden_layers_weights'].append(layer_weights)
+            info['hidden_layers_biases'].append(layer_biases)
         
-        # Collect output layer parameters
-        for i, neuron in enumerate(self.output_layer):
+        # Collect output layer parameters (unchanged)
+        for neuron in self.output_layer:
             info['output_layer_weights'].append(neuron.weights)
             info['output_layer_biases'].append(neuron.bias)
         
@@ -368,26 +404,31 @@ class NeuralNetwork:
     
     def print_network_structure(self):
         """
-        Print a visual representation of the network structure.
+        Print a visual representation of the variable network structure.
         """
         print("\n=== Network Architecture ===")
-        print("Input Layer (2 nodes)")
+        print(f"Input Layer ({self.input_size} nodes)")
         print("     |")
-        print("Hidden Layer (2 neurons)")
-        for i in range(self.hidden_size):
-            weights = [round(w, 3) for w in self.hidden_layer[i].weights]
-            bias = round(self.hidden_layer[i].bias, 3)
+        
+        # CHANGE: Print all hidden layers
+        for layer_idx, layer in enumerate(self.hidden_layers):
+            layer_size = len(layer)
+            print(f"Hidden Layer {layer_idx + 1} ({layer_size} neurons)")
+            for neuron_idx, neuron in enumerate(layer):
+                weights = [round(w, 3) for w in neuron.weights]
+                bias = round(neuron.bias, 3)
+                print(f"  Neuron {neuron_idx + 1}: W={weights}, b={bias}")
+            print("     |")
+        
+        print(f"Output Layer ({self.output_size} neurons)")
+        for i, neuron in enumerate(self.output_layer):
+            weights = [round(w, 3) for w in neuron.weights]
+            bias = round(neuron.bias, 3)
             print(f"  Neuron {i+1}: W={weights}, b={bias}")
-        print("     |")
-        print("Output Layer (2 neurons)")
-        for i in range(self.output_size):
-            weights = [round(w, 3) for w in self.output_layer[i].weights]
-            bias = round(self.output_layer[i].bias, 3)
-            print(f"  Neuron {i+1}: W={weights}, b={bias}")
 
 
 
-def generateDataTwoInputs(numSamples):
+def generate_data_two_inputs(numSamples):
     data=[]
     for i in range(numSamples):
         x = random.uniform(-5,5)
@@ -405,9 +446,12 @@ class Data_Point:
         else:
             self.t=0
             self.f=1
+    def give_inputs(self):
+        inputs=[self.x,self.y]
+        return inputs
 
 def main():
-    return 0
+    return
 
 """
 Journal
