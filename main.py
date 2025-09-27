@@ -279,9 +279,9 @@ class NeuralNetwork:
             print(f"Output neuron {i+1}: weights={[round(w, 3) for w in weights]}, bias={round(bias, 3)}")
             
             # Store intermediate values for debugging and visualization
-            self.last_inputs = None
-            self.last_hidden_outputs = []
-            self.last_outputs = None
+        self.last_inputs = None
+        self.last_hidden_outputs = []
+        self.last_outputs = None
     
     def forward(self, inputs):
         """
@@ -300,8 +300,6 @@ class NeuralNetwork:
         Returns:
             list: List of output values (length 2)
         """
-
-        inputs = []
 
         # Validate input size
 
@@ -433,10 +431,11 @@ def generate_data_two_inputs(numSamples):
     for i in range(numSamples):
         x = random.uniform(-5,5)
         y = random.uniform(-5,5)
-        dataPoint = Data_Point(x,y)
+        dataPoint = DataPoint(x,y)
         data.append(dataPoint)
+    return data
 
-class Data_Point:
+class DataPoint:
     def __init__(self, x, y):
         self.x = x
         self.y = y
@@ -451,9 +450,34 @@ class Data_Point:
         return inputs
 
 def main():
-    return
+
+    network = NeuralNetwork(
+        hidden_layers=[4],
+        input_size=2,
+        output_size=2,
+        hidden_activation='sigmoid',
+        output_activation='sigmoid',
+        random_seed=42
+    )
+    data=[]
+    data_points=[]
+
+    data_points=generate_data_two_inputs(3).copy()
+
+    for point in data_points:
+        input=[point.x, point.y]
+        data.append(input)
+
+    print(f"Inputs: {data}")
+
+    #Hello Claude. This is for you if you are looking with desktop commander. Here is the point my code is getting to in main()
+    outputs=network.predict(data)
+    print(f"Outputs: {outputs}")
+
+main()
 
 """
 Journal
 9/26 Making a map wasn't actually that useful for the neuron
+9/27 About to run the code for the first time
 """
