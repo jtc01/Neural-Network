@@ -282,6 +282,8 @@ class NeuralNetwork:
         self.last_inputs = None
         self.last_hidden_outputs = []
         self.last_outputs = None
+
+        self.cost = 0.0
     
     def forward(self, inputs):
         """
@@ -424,7 +426,80 @@ class NeuralNetwork:
             bias = round(neuron.bias, 3)
             print(f"  Neuron {i+1}: W={weights}, b={bias}")
 
+    def calculate_cost(self, inputs_array, expected_outputs_array):
+        """
+        Calculate the cost (loss) for a batch of data using Mean Squared Error.
+        
+        Cost = (1/2) * Σ(predicted_output - expected_output)²
+        
+        This measures how wrong the network's predictions are compared to the expected outputs.
+        Lower cost means better predictions.
+        
+        Args:
+            inputs_array (list): 2D list where each element is a list of input values
+                                Example: [[x1, y1], [x2, y2], [x3, y3]]
+            expected_outputs_array (list): 2D list where each element is a list of expected output values
+                                        Example: [[t1, f1], [t2, f2], [t3, f3]]
+            
+        Returns:
+            float: The calculated cost value
+            
+        Raises:
+            ValueError: If inputs_array and expected_outputs_array have different lengths
+        """
 
+        if len(inputs_array) != len(expected_outputs_array):
+            raise ValueError(f"Number of input samples ({len(inputs_array)}) must match number of output samples ({len(expected_outputs_array)})")
+    
+        total_cost = 0.0
+        
+        # Calculate cost for each data sample
+        for inputs, expected_outputs in zip(inputs_array, expected_outputs_array):
+            # Get the network's prediction for this input
+            predicted_outputs = self.forward(inputs)
+            
+            # Validate output dimensions
+            if len(predicted_outputs) != len(expected_outputs):
+                raise ValueError(f"Predicted outputs length ({len(predicted_outputs)}) doesn't match expected outputs length ({len(expected_outputs)})")
+            
+            # Calculate squared error for each output neuron
+            for predicted, expected in zip(predicted_outputs, expected_outputs):
+                error = predicted - expected
+                total_cost += error ** 2
+        
+        # Divide by 2 (as per MSE formula)
+        total_cost = total_cost / 2.0
+        
+        # Store the cost in the instance variable
+        self.cost = total_cost
+        
+        return total_cost
+    def calculate_single_cost(self, inputs, actual_outputs):
+        """
+        Calculate the cost for a single data point.
+        
+        Args:
+            data_point (DataPoint): Single DataPoint object
+            
+        Returns:
+            float: The cost for this single data point
+        """
+
+        # Get prediction
+        predicted_outputs = self.forward(inputs)
+        
+        if len(predicted_outputs) != len(actual_outputs):
+            raise ValueError(f"Predicted outputs length ({len(predicted_outputs)}) doesn't match expected outputs length ({len(expected_outputs)})")
+
+        # Calculate cost
+        cost = 0.0
+        for predicted, actual in zip(predicted_outputs, actual_outputs):
+            error = predicted - actual
+            cost += error ** 2
+        
+        cost = cost / 2.0
+        
+        return cost
 
 def generate_data_two_inputs(numSamples):
     data=[]
@@ -470,7 +545,6 @@ def main():
 
     print(f"Inputs: {data}")
 
-    #Hello Claude. This is for you if you are looking with desktop commander. Here is the point my code is getting to in main()
     outputs=network.predict(data)
     print(f"Outputs: {outputs}")
 
@@ -480,4 +554,5 @@ main()
 Journal
 9/26 Making a map wasn't actually that useful for the neuron
 9/27 About to run the code for the first time
+9/29 Ok now it gets real, time for training
 """
