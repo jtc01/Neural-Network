@@ -680,15 +680,38 @@ class DataPoint:
     def __init__(self, x, y):
         self.x = x
         self.y = y
+        self.set_expected_outputs(x,y)
+
+    def give_inputs(self):
+        inputs=[self.x,self.y]
+        return inputs
+    
+    def set_expected_outputs(self, x, y):#dynamic function that can change depending on what we want
+        
+        if y > (x/2)**2 - 2:
+            self.t=1
+            self.f=0
+        else:
+            self.t=0
+            self.f=1
+
+        """
+        if y>x*-1:
+            self.t=1
+            self.f=0
+        else:
+            self.t=0
+            self.f=1
+        """
+        
+        """
         if y<-x**4-x**3+3*x**2+2*x+4 and y>x**4/5-x**3+x/2:
             self.t=1
             self.f=0
         else:
             self.t=0
             self.f=1
-    def give_inputs(self):
-        inputs=[self.x,self.y]
-        return inputs
+        """
 
 def main():
 
@@ -701,30 +724,6 @@ def main():
         random_seed=42
     )
 
-    """
-    inputs=[]
-    data_points=[]
-    expected_outputs=[]
-
-    data_points=generate_data_two_inputs(6).copy()
-
-    for point in data_points:
-        input=[point.x, point.y]
-        inputs.append(input)
-        expected_output=[point.t, point.f]
-        expected_outputs.append(expected_output)
-
-    print(f"Inputs: {inputs}")
-
-    outputs=network.predict(inputs)
-    print(f"Outputs: {outputs}")
-
-    cost = network.calculate_cost(inputs, expected_outputs)
-
-    print(f"Cost: {cost}")
-
-    network.learn(inputs, expected_outputs)
-    """
     while True:
         inputs=[]
         data_points=[]
@@ -741,6 +740,15 @@ def main():
         if cost<=1:
             break
     network.print_network_structure()
+    a=0
+    for i in range(100):
+        point = DataPoint(random.uniform(-5,5), random.uniform(-5,5))
+        inputs = [point.x, point.y]
+        expected = [point.t, point.f]
+        output = network.forward(inputs)
+        if ((output[0]>output[1] and expected[0]>expected[1]) or (output[0]<output[1] and expected[0]<expected[1])):
+            a+=1
+    print(a)
 
 main()
 
