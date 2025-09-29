@@ -363,6 +363,7 @@ class NeuralNetwork:
             'last_inputs': self.last_inputs,
             'last_hidden_outputs': self.last_hidden_outputs,
             'last_outputs': self.last_outputs,
+            'cost': self.cost,
             'hidden_layers_weights': [],  # CHANGE: Now a list of lists
             'hidden_layers_biases': [],   # CHANGE: Now a list of lists
             'output_layer_weights': [],
@@ -500,6 +501,171 @@ class NeuralNetwork:
         cost = cost / 2.0
         
         return cost
+    
+    def learn(self, inputs_array, expected_outputs_array, learning_rate=0.01, h=0.0001):
+        """
+        Train the network using numerical gradient approximation (finite differences).
+        
+        This is a primitive learning method that:
+        1. Tests each weight/bias by making a small change (h)
+        2. Measures how the cost changes
+        3. Adjusts weights/biases in the direction that reduces cost
+        
+        This method is slow but educational - it shows how gradient descent works.
+        Real neural networks use backpropagation which is much faster.
+        
+        Args:
+            inputs_array (list): 2D list of input samples [[x1, y1], [x2, y2], ...]
+            expected_outputs_array (list): 2D list of expected outputs [[t1, f1], [t2, f2], ...]
+            learning_rate (float): How much to adjust weights/biases (default: 0.01)
+            h (float): Small value for testing weight changes (default: 0.0001)
+            
+        Returns:
+            float: The cost after this learning iteration
+        """
+        
+        # Calculate the initial cost (before any changes)
+        initial_cost = self.calculate_cost(inputs_array, expected_outputs_array)
+        
+        # Create multi-dimensional arrays to store cost gradients
+        # Structure mirrors the network architecture
+        hidden_weight_gradients = []  # Gradients for hidden layer weights
+        hidden_bias_gradients = []    # Gradients for hidden layer biases
+        output_weight_gradients = []  # Gradients for output layer weights
+        output_bias_gradients = []    # Gradients for output layer biases
+        
+        print(f"Initial cost: {initial_cost:.6f}")
+        print("Calculating gradients...")
+        
+        # ============================================
+        # STEP 1: Calculate gradients for HIDDEN LAYERS
+        # ============================================
+        for layer_idx, layer in enumerate(self.hidden_layers):
+            layer_weight_gradients = []
+            layer_bias_gradients = []
+            
+            for neuron_idx, neuron in enumerate(layer):
+                neuron_weight_gradients = []
+                
+                # Test each weight in this neuron
+                for weight_idx in range(len(neuron.weights)):
+                    # Save original weight
+                    original_weight = neuron.weights[weight_idx]
+                    
+                    # Increase weight by h
+                    neuron.weights[weight_idx] = original_weight + h
+                    
+                    # Calculate new cost with modified weight
+                    new_cost = self.calculate_cost(inputs_array, expected_outputs_array)
+                    
+                    # Calculate gradient: (change in cost) / (change in weight)
+                    gradient = (new_cost - initial_cost) / h
+                    neuron_weight_gradients.append(gradient)
+                    
+                    # Restore original weight
+                    neuron.weights[weight_idx] = original_weight
+                
+                layer_weight_gradients.append(neuron_weight_gradients)
+                
+                # Test the bias for this neuron
+                original_bias = neuron.bias
+                
+                # Increase bias by h
+                neuron.bias = original_bias + h
+                
+                # Calculate new cost with modified bias
+                new_cost = self.calculate_cost(inputs_array, expected_outputs_array)
+                
+                # Calculate gradient
+                bias_gradient = (new_cost - initial_cost) / h
+                layer_bias_gradients.append(bias_gradient)
+                
+                # Restore original bias
+                neuron.bias = original_bias
+            
+            hidden_weight_gradients.append(layer_weight_gradients)
+            hidden_bias_gradients.append(layer_bias_gradients)
+        
+        # ============================================
+        # STEP 2: Calculate gradients for OUTPUT LAYER
+        # ============================================
+        for neuron_idx, neuron in enumerate(self.output_layer):
+            neuron_weight_gradients = []
+            
+            # Test each weight in this output neuron
+            for weight_idx in range(len(neuron.weights)):
+                # Save original weight
+                original_weight = neuron.weights[weight_idx]
+                
+                # Increase weight by h
+                neuron.weights[weight_idx] = original_weight + h
+                
+                # Calculate new cost with modified weight
+                new_cost = self.calculate_cost(inputs_array, expected_outputs_array)
+                
+                # Calculate gradient
+                gradient = (new_cost - initial_cost) / h
+                neuron_weight_gradients.append(gradient)
+                
+                # Restore original weight
+                neuron.weights[weight_idx] = original_weight
+            
+            output_weight_gradients.append(neuron_weight_gradients)
+            
+            # Test the bias for this output neuron
+            original_bias = neuron.bias
+            
+            # Increase bias by h
+            neuron.bias = original_bias + h
+            
+            # Calculate new cost with modified bias
+            new_cost = self.calculate_cost(inputs_array, expected_outputs_array)
+            
+            # Calculate gradient
+            bias_gradient = (new_cost - initial_cost) / h
+            output_bias_gradients.append(bias_gradient)
+            
+            # Restore original bias
+            neuron.bias = original_bias
+        
+        print("Gradients calculated. Updating weights and biases...")
+        
+        # ============================================
+        # STEP 3: Update all HIDDEN LAYER weights and biases
+        # ============================================
+        for layer_idx, layer in enumerate(self.hidden_layers):
+            for neuron_idx, neuron in enumerate(layer):
+                # Update weights
+                for weight_idx in range(len(neuron.weights)):
+                    gradient = hidden_weight_gradients[layer_idx][neuron_idx][weight_idx]
+                    # Move in opposite direction of gradient (gradient descent)
+                    neuron.weights[weight_idx] -= learning_rate * gradient
+                
+                # Update bias
+                bias_gradient = hidden_bias_gradients[layer_idx][neuron_idx]
+                neuron.bias -= learning_rate * bias_gradient
+        
+        # ============================================
+        # STEP 4: Update all OUTPUT LAYER weights and biases
+        # ============================================
+        for neuron_idx, neuron in enumerate(self.output_layer):
+            # Update weights
+            for weight_idx in range(len(neuron.weights)):
+                gradient = output_weight_gradients[neuron_idx][weight_idx]
+                neuron.weights[weight_idx] -= learning_rate * gradient
+            
+            # Update bias
+            bias_gradient = output_bias_gradients[neuron_idx]
+            neuron.bias -= learning_rate * bias_gradient
+        
+        # Calculate final cost after updates
+        final_cost = self.calculate_cost(inputs_array, expected_outputs_array)
+        self.cost = final_cost
+        
+        print(f"Final cost: {final_cost:.6f}")
+        print(f"Cost improvement: {initial_cost - final_cost:.6f}\n")
+        
+        return final_cost
 
 def generate_data_two_inputs(numSamples):
     data=[]
@@ -534,19 +700,47 @@ def main():
         output_activation='sigmoid',
         random_seed=42
     )
-    data=[]
-    data_points=[]
 
-    data_points=generate_data_two_inputs(3).copy()
+    """
+    inputs=[]
+    data_points=[]
+    expected_outputs=[]
+
+    data_points=generate_data_two_inputs(6).copy()
 
     for point in data_points:
         input=[point.x, point.y]
-        data.append(input)
+        inputs.append(input)
+        expected_output=[point.t, point.f]
+        expected_outputs.append(expected_output)
 
-    print(f"Inputs: {data}")
+    print(f"Inputs: {inputs}")
 
-    outputs=network.predict(data)
+    outputs=network.predict(inputs)
     print(f"Outputs: {outputs}")
+
+    cost = network.calculate_cost(inputs, expected_outputs)
+
+    print(f"Cost: {cost}")
+
+    network.learn(inputs, expected_outputs)
+    """
+    while True:
+        inputs=[]
+        data_points=[]
+        expected_outputs=[]
+
+        data_points=generate_data_two_inputs(50).copy()
+
+        for point in data_points:
+            input=[point.x, point.y]
+            inputs.append(input)
+            expected_output=[point.t, point.f]
+            expected_outputs.append(expected_output)
+        cost = network.learn(inputs, expected_outputs)
+        if cost<=1:
+            break
+    network.print_network_structure()
 
 main()
 
@@ -554,5 +748,5 @@ main()
 Journal
 9/26 Making a map wasn't actually that useful for the neuron
 9/27 About to run the code for the first time
-9/29 Ok now it gets real, time for training
+9/29 I don't wanna start learning
 """
