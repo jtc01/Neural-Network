@@ -30,6 +30,10 @@ class Neuron:
         self.last_inputs = None
         self.last_weighted_sum = None
         self.last_output = None
+
+        # Node value = ∂Cost/∂(weighted_sum) for this neuron
+        self.node_value = 0.0
+
     
     def sigmoid(self, x):
         """
@@ -200,7 +204,8 @@ class Neuron:
             'activation_function': self.activation_function,
             'last_inputs': self.last_inputs,
             'last_weighted_sum': self.last_weighted_sum,
-            'last_output': self.last_output
+            'last_output': self.last_output,
+            'node_value': self.node_value
         }
 
 
@@ -666,6 +671,215 @@ class NeuralNetwork:
         print(f"Cost improvement: {initial_cost - final_cost:.6f}\n")
         
         return final_cost
+    
+    def backpropagate_output_layer(self, expected_outputs, learning_rate=0.05):
+        """
+        Calculate node values for the output layer neurons and update their weights and biases.
+        
+        For the output layer, the node value is:
+        node_value = ∂Cost/∂(weighted_sum)
+                    = ∂Cost/∂activation × ∂activation/∂(weighted_sum)
+        
+        Where:
+        - ∂Cost/∂activation = (predicted_output - expected_output)  [from MSE cost function]
+        - ∂activation/∂(weighted_sum) = activation_derivative(weighted_sum)
+        
+        After calculating node values, weights are updated using:
+        new_weight = old_weight - learning_rate × node_value × input_to_weight
+        
+        This method assumes forward() has already been called, so each neuron
+        has stored values in last_weighted_sum, last_output, and last_inputs.
+        
+        Args:
+            expected_outputs (list): The expected output values for this data point
+                                    Example: [1, 0] or [0, 1]
+            learning_rate (float): How much to adjust weights and biases
+        
+        Returns:
+            None (stores node values and updates weights/biases directly in each output neuron)
+        """
+        # Validate that we have expected outputs for each output neuron
+        if len(expected_outputs) != len(self.output_layer):
+            raise ValueError(f"Expected {len(self.output_layer)} output values, got {len(expected_outputs)}")
+        
+        # Calculate node value for each output neuron
+        for neuron_idx, neuron in enumerate(self.output_layer):
+            # Get the predicted output (activation) for this neuron
+            predicted_output = neuron.last_output
+            
+            # Get the expected output for this neuron
+            expected_output = expected_outputs[neuron_idx]
+            
+            # Calculate ∂Cost/∂activation
+            # For MSE cost = (1/2) * Σ(predicted - expected)²
+            # The derivative is: (predicted - expected)
+            cost_derivative = predicted_output - expected_output
+            
+            # Calculate ∂activation/∂(weighted_sum)
+            # This is the derivative of the activation function
+            activation_derivative = self.activation_derivative(
+                neuron.last_weighted_sum, 
+                neuron.activation_function
+            )
+            
+            # Calculate node value using chain rule
+            # node_value = ∂Cost/∂activation × ∂activation/∂(weighted_sum)
+            neuron.node_value = cost_derivative * activation_derivative
+
+            # ============================================
+            # UPDATE WEIGHTS AND BIAS FOR THIS OUTPUT NEURON
+            # ============================================
+            
+            # Update each weight
+            # Gradient for weight_i = node_value × input_i
+            # The input that flows through weight_i is stored in last_inputs[i]
+            for weight_idx in range(len(neuron.weights)):
+                # Get the input value that this weight receives
+                # For output layer, this is the activation from the last hidden layer
+                input_value = neuron.last_inputs[weight_idx]
+                
+                # Calculate gradient: ∂Cost/∂weight = node_value × input_value
+                weight_gradient = neuron.node_value * input_value
+                
+                # Update weight using gradient descent
+                neuron.weights[weight_idx] -= learning_rate * weight_gradient
+            
+            # Update bias
+            # Gradient for bias = node_value (since bias input is always 1)
+            bias_gradient = neuron.node_value
+            
+            # Update bias using gradient descent
+            neuron.bias -= learning_rate * bias_gradient
+
+    def activation_derivative(self, weighted_sum, activation_function):
+        """
+        Calculate the derivative of an activation function at a given weighted sum.
+        
+        Args:
+            weighted_sum (float): The weighted sum (z) at which to evaluate the derivative
+            activation_function (str): The type of activation function
+            
+        Returns:
+            float: The derivative value
+        """
+        if activation_function == 'sigmoid':
+            # For sigmoid: σ'(z) = σ(z) × (1 - σ(z))
+            # We can calculate this using the activation value
+            activation = 1.0 / (1.0 + math.exp(-weighted_sum)) if -500 < weighted_sum < 500 else (1.0 if weighted_sum > 0 else 0.0)
+            return activation * (1.0 - activation)
+        
+        elif activation_function == 'relu':
+            # For ReLU: f'(z) = 1 if z > 0, else 0
+            return 1.0 if weighted_sum > 0 else 0.0
+        
+        elif activation_function == 'tanh':
+            # For tanh: f'(z) = 1 - tanh²(z)
+            tanh_value = math.tanh(weighted_sum)
+            return 1.0 - tanh_value ** 2
+        
+        elif activation_function == 'linear':
+            # For linear: f'(z) = 1
+            return 1.0
+        
+        else:
+            # Default to sigmoid derivative
+            print(f"Warning: Unknown activation function '{activation_function}'. Using sigmoid derivative.")
+            activation = 1.0 / (1.0 + math.exp(-weighted_sum)) if -500 < weighted_sum < 500 else (1.0 if weighted_sum > 0 else 0.0)
+            return activation * (1.0 - activation)
+    def backpropagate_hidden_layers(self, learning_rate=0.05):
+        """
+        Calculate node values for all hidden layer neurons using backpropagation,
+        then update weights and biases.
+        
+        This method works backwards through the hidden layers, starting from the layer
+        closest to the output and moving towards the input.
+        
+        For each hidden neuron, the node value is:
+        node_value = activation_derivative(weighted_sum) × Σ(weight_to_next × node_value_next)
+        
+        After calculating node values, weights are updated using:
+        new_weight = old_weight - learning_rate × node_value × input_to_weight
+        
+        Where input_to_weight is the activation value that flows through that weight
+        (stored in neuron.last_inputs).
+        
+        Prerequisites:
+        - forward() must have been called (so neurons have last_weighted_sum and last_inputs values)
+        - backpropagate_output_layer() must have been called first
+        
+        Args:
+            learning_rate (float): How much to adjust weights and biases
+        
+        Returns:
+            None (stores node values and updates weights/biases directly in each hidden neuron)
+        """
+       
+        # Process hidden layers in reverse order (from output back to input)
+        # Start from the last hidden layer and move backwards
+        for layer_idx in range(len(self.hidden_layers) - 1, -1, -1):
+            current_layer = self.hidden_layers[layer_idx]
+            
+            # Determine which layer comes after this one
+            if layer_idx == len(self.hidden_layers) - 1:
+                # This is the last hidden layer, so next layer is output layer
+                next_layer = self.output_layer
+            else:
+                # Next layer is the following hidden layer
+                next_layer = self.hidden_layers[layer_idx + 1]
+            
+            # Calculate node value for each neuron in this layer
+            for neuron_idx, neuron in enumerate(current_layer):
+                # Initialize node value to 0
+                node_value = 0.0
+                
+                # Sum contributions from ALL neurons in the next layer
+                for next_neuron_idx, next_neuron in enumerate(next_layer):
+                    # Get the weight connecting this neuron to the next neuron
+                    # The weight is stored in the next neuron's weights array
+                    # at the index corresponding to this neuron's position
+                    weight_to_next = next_neuron.weights[neuron_idx]
+                    
+                    # Get the node value of the next neuron (already calculated)
+                    next_node_value = next_neuron.node_value
+                    
+                    # Add this contribution to the sum
+                    node_value += weight_to_next * next_node_value
+                
+                # Multiply by the activation derivative for this neuron
+                activation_deriv = self.activation_derivative(
+                    neuron.last_weighted_sum,
+                    neuron.activation_function
+                )
+                
+                node_value *= activation_deriv
+                
+                # Store the calculated node value in the neuron
+                neuron.node_value = node_value
+
+                # ============================================
+                # UPDATE WEIGHTS AND BIAS FOR THIS NEURON
+                # ============================================
+                
+                # Update each weight
+                # Gradient for weight_i = node_value × input_i
+                # The input that flows through weight_i is stored in last_inputs[i]
+                for weight_idx in range(len(neuron.weights)):
+                    # Get the input value that this weight receives
+                    input_value = neuron.last_inputs[weight_idx]
+                    
+                    # Calculate gradient: ∂Cost/∂weight = node_value × input_value
+                    weight_gradient = neuron.node_value * input_value
+                    
+                    # Update weight using gradient descent
+                    neuron.weights[weight_idx] -= learning_rate * weight_gradient
+                
+                # Update bias
+                # Gradient for bias = node_value × 1 (since bias input is always 1)
+                # So bias_gradient = node_value
+                bias_gradient = neuron.node_value
+                
+                # Update bias using gradient descent
+                neuron.bias -= learning_rate * bias_gradient
 
 def generate_data_two_inputs(numSamples):
     data=[]
@@ -687,13 +901,14 @@ class DataPoint:
         return inputs
     
     def set_expected_outputs(self, x, y):#dynamic function that can change depending on what we want
-        
+        """
         if y > (x/2)**2 - 2:
             self.t=1
             self.f=0
         else:
             self.t=0
             self.f=1
+        """
 
         """
         if y>x*-1:
@@ -704,14 +919,14 @@ class DataPoint:
             self.f=1
         """
         
-        """
+        
         if y<-x**4-x**3+3*x**2+2*x+4 and y>x**4/5-x**3+x/2:
             self.t=1
             self.f=0
         else:
             self.t=0
             self.f=1
-        """
+        
 
 def main():
 
@@ -723,6 +938,9 @@ def main():
         output_activation='sigmoid',
         random_seed=42
     )
+
+    counter=0
+    total_forwards=0
 
     while True:
         inputs=[]
@@ -736,19 +954,21 @@ def main():
             inputs.append(input)
             expected_output=[point.t, point.f]
             expected_outputs.append(expected_output)
-        cost = network.learn(inputs, expected_outputs)
-        if cost<=1:
+        incorrect=0
+        for i in range(len(data_points)):
+            output=network.forward(inputs[i])
+            if (expected_outputs[i][0]>expected_outputs[i][1] and output[0]<output[1]) or (expected_outputs[i][0]<expected_outputs[i][1] and output[0]>output[1]):
+                incorrect+=1
+            network.backpropagate_output_layer(expected_outputs[i], 0.05)
+            network.backpropagate_hidden_layers(0.05)
+        if incorrect==0:
+            network.print_network_structure
             break
-    network.print_network_structure()
-    a=0
-    for i in range(100):
-        point = DataPoint(random.uniform(-5,5), random.uniform(-5,5))
-        inputs = [point.x, point.y]
-        expected = [point.t, point.f]
-        output = network.forward(inputs)
-        if ((output[0]>output[1] and expected[0]>expected[1]) or (output[0]<output[1] and expected[0]<expected[1])):
-            a+=1
-    print(a)
+        else:
+            counter+=1
+            total_forwards+=50
+            print(f"{counter} | {total_forwards} | {incorrect}")
+    
 
 main()
 
@@ -757,4 +977,5 @@ Journal
 9/26 Making a map wasn't actually that useful for the neuron
 9/27 About to run the code for the first time
 9/29 I don't wanna start learning
+10/5 I just added a ton of stuff without testing yolo
 """
