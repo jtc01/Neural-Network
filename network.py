@@ -880,97 +880,9 @@ class NeuralNetwork:
                 
                 # Update bias using gradient descent
                 neuron.bias -= learning_rate * bias_gradient
-
-def generate_data_two_inputs(numSamples):
-    data=[]
-    for i in range(numSamples):
-        x = random.uniform(-5,5)
-        y = random.uniform(-5,5)
-        dataPoint = DataPoint(x,y)
-        data.append(dataPoint)
-    return data
-
-class DataPoint:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.set_expected_outputs(x,y)
-
-    def give_inputs(self):
-        inputs=[self.x,self.y]
-        return inputs
-    
-    def set_expected_outputs(self, x, y):#dynamic function that can change depending on what we want
-        """
-        if y > (x/2)**2 - 2:
-            self.t=1
-            self.f=0
-        else:
-            self.t=0
-            self.f=1
-        """
-
-        """
-        if y>x*-1:
-            self.t=1
-            self.f=0
-        else:
-            self.t=0
-            self.f=1
-        """
-        
-        
-        if y<-x**4-x**3+3*x**2+2*x+4 and y>x**4/5-x**3+x/2:
-            self.t=1
-            self.f=0
-        else:
-            self.t=0
-            self.f=1
         
 
-def main():
 
-    network = NeuralNetwork(
-        hidden_layers=[4],
-        input_size=2,
-        output_size=2,
-        hidden_activation='sigmoid',
-        output_activation='sigmoid',
-        random_seed=42
-    )
-
-    counter=0
-    total_forwards=0
-
-    while True:
-        inputs=[]
-        data_points=[]
-        expected_outputs=[]
-
-        data_points=generate_data_two_inputs(50).copy()
-
-        for point in data_points:
-            input=[point.x, point.y]
-            inputs.append(input)
-            expected_output=[point.t, point.f]
-            expected_outputs.append(expected_output)
-        incorrect=0
-        for i in range(len(data_points)):
-            output=network.forward(inputs[i])
-            if (expected_outputs[i][0]>expected_outputs[i][1] and output[0]<output[1]) or (expected_outputs[i][0]<expected_outputs[i][1] and output[0]>output[1]):
-                incorrect+=1
-            network.backpropagate_output_layer(expected_outputs[i], 0.05)
-            network.backpropagate_hidden_layers(0.05)
-        if incorrect==0:
-            network.print_network_structure
-            break
-        else:
-            counter+=1
-            total_forwards+=50
-            print(f"{counter} | {total_forwards} | {incorrect}")
-    
-
-main()
 
 """
 Journal
