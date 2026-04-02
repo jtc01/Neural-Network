@@ -786,6 +786,8 @@ class NeuralNetwork:
             print(f"Warning: Unknown activation function '{activation_function}'. Using sigmoid derivative.")
             activation = 1.0 / (1.0 + math.exp(-weighted_sum)) if -500 < weighted_sum < 500 else (1.0 if weighted_sum > 0 else 0.0)
             return activation * (1.0 - activation)
+        
+        
     def backpropagate_hidden_layers(self, learning_rate=0.05):
         """
         Calculate node values for all hidden layer neurons using backpropagation,

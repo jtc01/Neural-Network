@@ -1,10 +1,11 @@
 from network import NeuralNetwork
-from dataset import load_dataset
+from network import Neuron
+from datasets import load_dataset
 import random
 
 class DataPoint:
     def __init__(self, input=None, output=0):
-        if self.input is None:
+        if input is None:
             raise ValueError("Input cannot be None.")
         elif len(input) != 784:
             raise ValueError("Input must be a list of length 784.")
@@ -23,22 +24,25 @@ def main():
     train_set = dataset["train"]
 
     network = NeuralNetwork(
-        hidden_layers=[128, 64],
+        hidden_layers=[512, 256, 128],
         input_size=784,
         output_size=10,
         hidden_activation='relu',
-        output_activation='softmax',
+        output_activation='sigmoid',
         random_seed=67
     )
 
-    i = random.randint(0, len(train_set)-1)
+    k = 0
+    e=0
 
     streak = 0
+
+    correct = 0
 
     while True:
         inputs = []
         
-        numeral = train_set[i]
+        numeral = train_set[k]
         label = numeral["label"]
 
         image = numeral["image"]
@@ -46,25 +50,41 @@ def main():
             for j in range(28):
                 pixel = image.getpixel((j, i))/255
                 inputs.append(pixel)
-        
-        expected_outputs = [0]*10
-        expected_outputs[label] = 1
+
+        index = int(label)
+        expected_outputs = [0.0]*10
+        expected_outputs[index] = 1
 
         output = network.forward(inputs)
         result = output.index(max(output))
-        print(f"{label} | {result}")
 
         if label == result:
             streak += 1
+            correct += 1
+
         else:
             streak = 0
-        
-        if streak >= 10:
-            network.print_network_structure()
-            break
+
+        k+=1
+
+        if k%1000 == 0:
+            print(f"{k} | {label} | {result}")
+            results = []
+            for neuron in network.output_layer:
+                results.append(neuron.last_output)
+            print(results)
+            print(expected_outputs)
+
+        if k >= len(train_set):
+            k = 0
+            e+=1
+            print(f"{e} epochs completed.")
+            print(f"Epoch accuracy: {correct/(len(train_set)):.2%}")
+            correct = 0
 
         network.backpropagate_output_layer(expected_outputs, 0.01)
         network.backpropagate_hidden_layers(0.01)
 
 
 main()
+#24579
