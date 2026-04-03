@@ -28,7 +28,7 @@ def main():
         input_size=784,
         output_size=10,
         hidden_activation='relu',
-        output_activation='sigmoid',
+        output_activation='softmax',
         random_seed=67
     )
 
@@ -67,13 +67,13 @@ def main():
 
         k+=1
 
-        if k%1000 == 0:
-            print(f"{k} | {label} | {result}")
-            results = []
-            for neuron in network.output_layer:
-                results.append(neuron.last_output)
-            print(results)
-            print(expected_outputs)
+        #if k%100 == 0:
+        print(f"{k} | {label} | {result}")
+        results = []
+        for neuron in network.output_layer:
+            results.append(neuron.last_output)
+        print(f"network results: {results}")
+        print(f"expected_outputs: {expected_outputs}")
 
         if k >= len(train_set):
             k = 0

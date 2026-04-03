@@ -101,6 +101,18 @@ class Neuron:
         """
         return x
     
+    def exponential(self, x):
+        """
+        Exponential activation function: f(x) = e^x
+        
+        This function maps any real number to a positive value.
+        Can be used in certain types of networks or output layers.
+        
+        Args:
+            x (float): Input value to the activation function
+        """
+        return math.exp(x)
+    
     def apply_activation(self, x):
         """
         Apply the specified activation function to the input.
@@ -119,6 +131,8 @@ class Neuron:
             return self.tanh(x)
         elif self.activation_function == 'linear':
             return self.linear(x)
+        elif self.activation_function == 'exponential':
+            return self.exponential(x)
         else:
             # Default to sigmoid if unknown activation function
             print(f"Warning: Unknown activation function '{self.activation_function}'. Using sigmoid.")
@@ -244,7 +258,13 @@ class NeuralNetwork:
         
         # Store activation function types
         self.hidden_activation = hidden_activation
-        self.output_activation = output_activation
+        if output_activation == 'softmax':
+            self.using_softmax = True
+            self.output_activation = 'linear'  # Use exponential for softmax calculation
+            print("Using Softmax output")
+        else:
+            self.using_softmax = False
+            self.output_activation = output_activation
         
          # Initialize variable number of hidden layers
         self.hidden_layers = []  # This will be a list of lists (layers of neurons)
@@ -268,20 +288,21 @@ class NeuralNetwork:
                 bias = random.uniform(-1, 1)
                 neuron = Neuron(weights=weights, bias=bias, activation_function=hidden_activation)
                 layer_neurons.append(neuron)
-                print(f"Hidden Layer {layer_idx+1}, Neuron {neuron_idx+1}: weights={[round(w, 3) for w in weights]}, bias={round(bias, 3)}")
+                #print(f"Hidden Layer {layer_idx+1}, Neuron {neuron_idx+1}: weights={[round(w, 3) for w in weights]}, bias={round(bias, 3)}")
         
             self.hidden_layers.append(layer_neurons)
         
         self.output_layer = []
         last_hidden_size = hidden_layers[-1] if hidden_layers else self.input_size
+
     
         for i in range(self.output_size):
             weights = [random.uniform(-1, 1) for _ in range(last_hidden_size)]
             bias = random.uniform(-1, 1)
             # Create the output neuron
-            neuron = Neuron(weights=weights, bias=bias, activation_function=output_activation)
+            neuron = Neuron(weights=weights, bias=bias, activation_function=self.output_activation)
             self.output_layer.append(neuron)
-            print(f"Output neuron {i+1}: weights={[round(w, 3) for w in weights]}, bias={round(bias, 3)}")
+            #print(f"Output neuron {i+1}: weights={[round(w, 3) for w in weights]}, bias={round(bias, 3)}")
             
             # Store intermediate values for debugging and visualization
         self.last_inputs = None
@@ -307,6 +328,8 @@ class NeuralNetwork:
         Returns:
             list: List of output values (length 2)
         """
+
+        print("=== Forward Pass ===")
 
         # Validate input size
 
@@ -340,10 +363,19 @@ class NeuralNetwork:
         for neuron in self.output_layer:
             output = neuron.forward(current_inputs)
             final_outputs.append(output)
+
+        if self.using_softmax:
+            print(f"Original outputs {final_outputs}")
+            # Apply softmax to the final outputs, assuming linear activation was used for output neurons
+            max_output = max(final_outputs)  # For numerical stability
+            print(f"Max output: {max_output}")
+            exp_outputs = [math.exp(o - max_output) for o in final_outputs]  # Subtract max for stability
+            sum_exp_outputs = sum(exp_outputs)
+            print(f"Sum of exponentials: {sum_exp_outputs}")
+            final_outputs = [exp_o / sum_exp_outputs for exp_o in exp_outputs]
         
         # Store final outputs for debugging
         self.last_outputs = final_outputs.copy()
-        
         return final_outputs
     
     def get_network_info(self):
@@ -718,7 +750,7 @@ class NeuralNetwork:
             # Calculate ∂activation/∂(weighted_sum)
             # This is the derivative of the activation function
             activation_derivative = self.activation_derivative(
-                neuron.last_weighted_sum, 
+                neuron.last_weighted_sum,
                 neuron.activation_function
             )
             
