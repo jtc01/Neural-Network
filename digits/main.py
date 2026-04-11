@@ -50,6 +50,8 @@ def main():
             for j in range(28):
                 pixel = image.getpixel((j, i))/255
                 inputs.append(pixel)
+        
+        print(inputs)
 
         index = int(label)
         expected_outputs = [0.0]*10
@@ -67,7 +69,9 @@ def main():
 
         k+=1
 
-        #if k%100 == 0:
+        if k%100 == 0:
+            break
+
         print(f"{k} | {label} | {result}")
         results = []
         for neuron in network.output_layer:
@@ -82,8 +86,9 @@ def main():
             print(f"Epoch accuracy: {correct/(len(train_set)):.2%}")
             correct = 0
 
-        network.backpropagate_output_layer(expected_outputs, 0.01)
-        network.backpropagate_hidden_layers(0.01)
+        network.backpropagate_output_layer(expected_outputs, 0.00001)
+        network.backpropagate_hidden_layers(0.00001)
+    network.print_network_structure()
 
 
 main()
