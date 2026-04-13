@@ -237,7 +237,7 @@ class NeuralNetwork:
     3. Output layer produces final predictions
     """
     
-    def __init__(self, hidden_layers, input_size=2, output_size=2, hidden_activation='sigmoid', output_activation='sigmoid', random_seed=None):
+    def __init__(self, hidden_layers, input_size=2, output_size=2, hidden_activation='sigmoid', output_activation='sigmoid', random_seed=None, cost_function='mse'):
         """
         Initialize the neural network with random weights and biases.
         
@@ -255,6 +255,7 @@ class NeuralNetwork:
         self.hidden_layers_sizes = hidden_layers.copy()  # Store the architecture
         self.output_size = output_size
         self.num_hidden_layers = len(hidden_layers)
+        self.cost_function = cost_function
         
         # Store activation function types
         self.hidden_activation = hidden_activation
@@ -284,8 +285,9 @@ class NeuralNetwork:
             # Create neurons for this layer
             for neuron_idx in range(layer_size):
                 # Generate random weights for connections to this neuron
-                weights = [random.uniform(-1, 1) for _ in range(input_connections)]
-                bias = random.uniform(-1, 1)
+                weights = [random.gauss(0, math.sqrt(2/input_connections)) for _ in range(input_connections)]
+                bias = 0.0  # Initialize bias to 0 for better training stability
+                # Create the neuron and add it to the layer
                 neuron = Neuron(weights=weights, bias=bias, activation_function=hidden_activation)
                 layer_neurons.append(neuron)
                 #print(f"Hidden Layer {layer_idx+1}, Neuron {neuron_idx+1}: weights={[round(w, 3) for w in weights]}, bias={round(bias, 3)}")
@@ -297,12 +299,11 @@ class NeuralNetwork:
 
     
         for i in range(self.output_size):
-            weights = [random.uniform(-1, 1) for _ in range(last_hidden_size)]
-            bias = random.uniform(-1, 1)
+            weights = [random.gauss(0, math.sqrt(2/last_hidden_size)) for _ in range(last_hidden_size)]
+            bias = 0.0  # Initialize bias to 0 for better training stability
             # Create the output neuron
             neuron = Neuron(weights=weights, bias=bias, activation_function=self.output_activation)
             self.output_layer.append(neuron)
-            #print(f"Output neuron {i+1}: weights={[round(w, 3) for w in weights]}, bias={round(bias, 3)}")
             
             # Store intermediate values for debugging and visualization
         self.last_inputs = None
@@ -329,7 +330,6 @@ class NeuralNetwork:
             list: List of output values (length 2)
         """
 
-        print("=== Forward Pass ===")
 
         # Validate input size
 
@@ -365,13 +365,10 @@ class NeuralNetwork:
             final_outputs.append(output)
 
         if self.using_softmax:
-            print(f"Original outputs {final_outputs}")
             # Apply softmax to the final outputs, assuming linear activation was used for output neurons
             max_output = max(final_outputs)  # For numerical stability
-            print(f"Max output: {max_output}")
             exp_outputs = [math.exp(o - max_output) for o in final_outputs]  # Subtract max for stability
             sum_exp_outputs = sum(exp_outputs)
-            print(f"Sum of exponentials: {sum_exp_outputs}")
             final_outputs = [exp_o / sum_exp_outputs for exp_o in exp_outputs]
         
         # Store final outputs for debugging
@@ -462,247 +459,8 @@ class NeuralNetwork:
         for i, neuron in enumerate(self.output_layer):
             weights = [round(w, 3) for w in neuron.weights]
             bias = round(neuron.bias, 3)
-            print(f"  Neuron {i+1}: W={weights}, b={bias}")
+            print(f"  Neuron {i+1}: W={weights}, b={bias}")        
 
-    def calculate_cost(self, inputs_array, expected_outputs_array):
-        """
-        Calculate the cost (loss) for a batch of data using Mean Squared Error.
-        
-        Cost = (1/2) * Σ(predicted_output - expected_output)²
-        
-        This measures how wrong the network's predictions are compared to the expected outputs.
-        Lower cost means better predictions.
-        
-        Args:
-            inputs_array (list): 2D list where each element is a list of input values
-                                Example: [[x1, y1], [x2, y2], [x3, y3]]
-            expected_outputs_array (list): 2D list where each element is a list of expected output values
-                                        Example: [[t1, f1], [t2, f2], [t3, f3]]
-            
-        Returns:
-            float: The calculated cost value
-            
-        Raises:
-            ValueError: If inputs_array and expected_outputs_array have different lengths
-        """
-
-        if len(inputs_array) != len(expected_outputs_array):
-            raise ValueError(f"Number of input samples ({len(inputs_array)}) must match number of output samples ({len(expected_outputs_array)})")
-    
-        total_cost = 0.0
-        
-        # Calculate cost for each data sample
-        for inputs, expected_outputs in zip(inputs_array, expected_outputs_array):
-            # Get the network's prediction for this input
-            predicted_outputs = self.forward(inputs)
-            
-            # Validate output dimensions
-            if len(predicted_outputs) != len(expected_outputs):
-                raise ValueError(f"Predicted outputs length ({len(predicted_outputs)}) doesn't match expected outputs length ({len(expected_outputs)})")
-            
-            # Calculate squared error for each output neuron
-            for predicted, expected in zip(predicted_outputs, expected_outputs):
-                error = predicted - expected
-                total_cost += error ** 2
-        
-        # Divide by 2 (as per MSE formula)
-        total_cost = total_cost / 2.0
-        
-        # Store the cost in the instance variable
-        self.cost = total_cost
-        
-        return total_cost
-    def calculate_single_cost(self, inputs, actual_outputs):
-        """
-        Calculate the cost for a single data point.
-        
-        Args:
-            data_point (DataPoint): Single DataPoint object
-            
-        Returns:
-            float: The cost for this single data point
-        """
-
-        # Get prediction
-        predicted_outputs = self.forward(inputs)
-        
-        if len(predicted_outputs) != len(actual_outputs):
-            raise ValueError(f"Predicted outputs length ({len(predicted_outputs)}) doesn't match expected outputs length ({len(expected_outputs)})")
-
-        # Calculate cost
-        cost = 0.0
-        for predicted, actual in zip(predicted_outputs, actual_outputs):
-            error = predicted - actual
-            cost += error ** 2
-        
-        cost = cost / 2.0
-        
-        return cost
-    
-    def learn(self, inputs_array, expected_outputs_array, learning_rate=0.01, h=0.0001):
-        """
-        Train the network using numerical gradient approximation (finite differences).
-        
-        This is a primitive learning method that:
-        1. Tests each weight/bias by making a small change (h)
-        2. Measures how the cost changes
-        3. Adjusts weights/biases in the direction that reduces cost
-        
-        This method is slow but educational - it shows how gradient descent works.
-        Real neural networks use backpropagation which is much faster.
-        
-        Args:
-            inputs_array (list): 2D list of input samples [[x1, y1], [x2, y2], ...]
-            expected_outputs_array (list): 2D list of expected outputs [[t1, f1], [t2, f2], ...]
-            learning_rate (float): How much to adjust weights/biases (default: 0.01)
-            h (float): Small value for testing weight changes (default: 0.0001)
-            
-        Returns:
-            float: The cost after this learning iteration
-        """
-        
-        # Calculate the initial cost (before any changes)
-        initial_cost = self.calculate_cost(inputs_array, expected_outputs_array)
-        
-        # Create multi-dimensional arrays to store cost gradients
-        # Structure mirrors the network architecture
-        hidden_weight_gradients = []  # Gradients for hidden layer weights
-        hidden_bias_gradients = []    # Gradients for hidden layer biases
-        output_weight_gradients = []  # Gradients for output layer weights
-        output_bias_gradients = []    # Gradients for output layer biases
-        
-        print(f"Initial cost: {initial_cost:.6f}")
-        print("Calculating gradients...")
-        
-        # ============================================
-        # STEP 1: Calculate gradients for HIDDEN LAYERS
-        # ============================================
-        for layer_idx, layer in enumerate(self.hidden_layers):
-            layer_weight_gradients = []
-            layer_bias_gradients = []
-            
-            for neuron_idx, neuron in enumerate(layer):
-                neuron_weight_gradients = []
-                
-                # Test each weight in this neuron
-                for weight_idx in range(len(neuron.weights)):
-                    # Save original weight
-                    original_weight = neuron.weights[weight_idx]
-                    
-                    # Increase weight by h
-                    neuron.weights[weight_idx] = original_weight + h
-                    
-                    # Calculate new cost with modified weight
-                    new_cost = self.calculate_cost(inputs_array, expected_outputs_array)
-                    
-                    # Calculate gradient: (change in cost) / (change in weight)
-                    gradient = (new_cost - initial_cost) / h
-                    neuron_weight_gradients.append(gradient)
-                    
-                    # Restore original weight
-                    neuron.weights[weight_idx] = original_weight
-                
-                layer_weight_gradients.append(neuron_weight_gradients)
-                
-                # Test the bias for this neuron
-                original_bias = neuron.bias
-                
-                # Increase bias by h
-                neuron.bias = original_bias + h
-                
-                # Calculate new cost with modified bias
-                new_cost = self.calculate_cost(inputs_array, expected_outputs_array)
-                
-                # Calculate gradient
-                bias_gradient = (new_cost - initial_cost) / h
-                layer_bias_gradients.append(bias_gradient)
-                
-                # Restore original bias
-                neuron.bias = original_bias
-            
-            hidden_weight_gradients.append(layer_weight_gradients)
-            hidden_bias_gradients.append(layer_bias_gradients)
-        
-        # ============================================
-        # STEP 2: Calculate gradients for OUTPUT LAYER
-        # ============================================
-        for neuron_idx, neuron in enumerate(self.output_layer):
-            neuron_weight_gradients = []
-            
-            # Test each weight in this output neuron
-            for weight_idx in range(len(neuron.weights)):
-                # Save original weight
-                original_weight = neuron.weights[weight_idx]
-                
-                # Increase weight by h
-                neuron.weights[weight_idx] = original_weight + h
-                
-                # Calculate new cost with modified weight
-                new_cost = self.calculate_cost(inputs_array, expected_outputs_array)
-                
-                # Calculate gradient
-                gradient = (new_cost - initial_cost) / h
-                neuron_weight_gradients.append(gradient)
-                
-                # Restore original weight
-                neuron.weights[weight_idx] = original_weight
-            
-            output_weight_gradients.append(neuron_weight_gradients)
-            
-            # Test the bias for this output neuron
-            original_bias = neuron.bias
-            
-            # Increase bias by h
-            neuron.bias = original_bias + h
-            
-            # Calculate new cost with modified bias
-            new_cost = self.calculate_cost(inputs_array, expected_outputs_array)
-            
-            # Calculate gradient
-            bias_gradient = (new_cost - initial_cost) / h
-            output_bias_gradients.append(bias_gradient)
-            
-            # Restore original bias
-            neuron.bias = original_bias
-        
-        print("Gradients calculated. Updating weights and biases...")
-        
-        # ============================================
-        # STEP 3: Update all HIDDEN LAYER weights and biases
-        # ============================================
-        for layer_idx, layer in enumerate(self.hidden_layers):
-            for neuron_idx, neuron in enumerate(layer):
-                # Update weights
-                for weight_idx in range(len(neuron.weights)):
-                    gradient = hidden_weight_gradients[layer_idx][neuron_idx][weight_idx]
-                    # Move in opposite direction of gradient (gradient descent)
-                    neuron.weights[weight_idx] -= learning_rate * gradient
-                
-                # Update bias
-                bias_gradient = hidden_bias_gradients[layer_idx][neuron_idx]
-                neuron.bias -= learning_rate * bias_gradient
-        
-        # ============================================
-        # STEP 4: Update all OUTPUT LAYER weights and biases
-        # ============================================
-        for neuron_idx, neuron in enumerate(self.output_layer):
-            # Update weights
-            for weight_idx in range(len(neuron.weights)):
-                gradient = output_weight_gradients[neuron_idx][weight_idx]
-                neuron.weights[weight_idx] -= learning_rate * gradient
-            
-            # Update bias
-            bias_gradient = output_bias_gradients[neuron_idx]
-            neuron.bias -= learning_rate * bias_gradient
-        
-        # Calculate final cost after updates
-        final_cost = self.calculate_cost(inputs_array, expected_outputs_array)
-        self.cost = final_cost
-        
-        print(f"Final cost: {final_cost:.6f}")
-        print(f"Cost improvement: {initial_cost - final_cost:.6f}\n")
-        
-        return final_cost
     
     def backpropagate_output_layer(self, expected_outputs, learning_rate=0.05):
         """
@@ -742,21 +500,36 @@ class NeuralNetwork:
             # Get the expected output for this neuron
             expected_output = expected_outputs[neuron_idx]
             
-            # Calculate ∂Cost/∂activation
-            # For MSE cost = (1/2) * Σ(predicted - expected)²
-            # The derivative is: (predicted - expected)
-            cost_derivative = predicted_output - expected_output
-            
-            # Calculate ∂activation/∂(weighted_sum)
-            # This is the derivative of the activation function
-            activation_derivative = self.activation_derivative(
-                neuron.last_weighted_sum,
-                neuron.activation_function
-            )
-            
-            # Calculate node value using chain rule
-            # node_value = ∂Cost/∂activation × ∂activation/∂(weighted_sum)
-            neuron.node_value = cost_derivative * activation_derivative
+            if self.cost_function == 'cross-entropy':
+                # Calculate ∂Cost/∂activation using the cross-entropy cost function
+                neuron.node_value = predicted_output - expected_output
+            elif self.cost_function == 'mse':
+                # Calculate ∂Cost/∂activation
+                # For MSE cost = (1/2) * Σ(predicted - expected)²
+                # The derivative is: (predicted - expected)
+                cost_derivative = predicted_output - expected_output
+                
+                # Calculate ∂activation/∂(weighted_sum)
+                # This is the derivative of the activation function
+                activation_derivative = self.activation_derivative(
+                    neuron.last_weighted_sum,
+                    neuron.activation_function
+                )
+                
+                # Calculate node value using chain rule
+                # node_value = ∂Cost/∂activation × ∂activation/∂(weighted_sum)
+                neuron.node_value = cost_derivative * activation_derivative
+            else:
+                print(f"Warning: Unknown cost function '{self.cost_function}'. Defaulting to MSE.")
+                #Same as above
+                cost_derivative = predicted_output - expected_output
+                
+                activation_derivative = self.activation_derivative(
+                    neuron.last_weighted_sum,
+                    neuron.activation_function
+                )
+                
+                neuron.node_value = cost_derivative * activation_derivative
 
             # ============================================
             # UPDATE WEIGHTS AND BIAS FOR THIS OUTPUT NEURON
