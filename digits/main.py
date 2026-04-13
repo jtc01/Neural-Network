@@ -1,7 +1,10 @@
 from network import NeuralNetwork
 from network import Neuron
 from datasets import load_dataset
+import math
 import random
+
+import network
 
 class DataPoint:
     def __init__(self, input=None, output=0):
@@ -51,7 +54,7 @@ def main():
                 pixel = image.getpixel((j, i))/255
                 inputs.append(pixel)
         
-        print(inputs)
+        #print(inputs)
 
         index = int(label)
         expected_outputs = [0.0]*10
@@ -69,26 +72,46 @@ def main():
 
         k+=1
 
-        if k%100 == 0:
-            break
+        if k%1000 == 0:
+            print(f"{k} | {label} | {result}")
 
-        print(f"{k} | {label} | {result}")
-        results = []
-        for neuron in network.output_layer:
-            results.append(neuron.last_output)
-        print(f"network results: {results}")
-        print(f"expected_outputs: {expected_outputs}")
+
+        #print(f"network results: {results}")
+        #print(f"expected_outputs: {expected_outputs}")
 
         if k >= len(train_set):
-            k = 0
-            e+=1
-            print(f"{e} epochs completed.")
-            print(f"Epoch accuracy: {correct/(len(train_set)):.2%}")
+            k = (e) * 100
             correct = 0
+            total_loss = 0
+            for i in range(100):
+                numeral = train_set[k + i]
+                label = int(numeral["label"])
 
-        network.backpropagate_output_layer(expected_outputs, 0.00001)
-        network.backpropagate_hidden_layers(0.00001)
+                image = numeral["image"]
+                inputs = []
+                for i in range(28):
+                    for j in range(28):
+                        pixel = image.getpixel((j, i))/255
+                        inputs.append(pixel)
+
+                output = network.forward(inputs)
+                result = output.index(max(output))
+                if label == result:
+                    correct +=1
+                loss = cross_entropy_loss(output, label)
+                total_loss += loss
+            print(f"Epoch {e+1} - Accuracy: {correct/100:.2%}, Average Loss: {total_loss/100:.4f}")
+            e+=1
+
+        network.backpropagate_output_layer(expected_outputs, 0.001)
+        network.backpropagate_hidden_layers(0.001)
     network.print_network_structure()
+
+def cross_entropy_loss(softmax_outputs, true_label):
+    # Add small epsilon to prevent log(0)
+    epsilon = 1e-10
+    return -math.log(softmax_outputs[true_label] + epsilon)
+
 
 
 main()
