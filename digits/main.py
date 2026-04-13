@@ -25,6 +25,7 @@ def main():
 
     dataset = load_dataset("ylecun/mnist")
     train_set = dataset["train"]
+    test_set = dataset["test"]
 
     network = NeuralNetwork(
         hidden_layers=[512, 256, 128],
@@ -72,19 +73,20 @@ def main():
 
         k+=1
 
-        if k%1000 == 0:
+        if k%100 == 0:
             print(f"{k} | {label} | {result}")
 
 
         #print(f"network results: {results}")
         #print(f"expected_outputs: {expected_outputs}")
 
-        if k >= len(train_set):
-            k = (e) * 100
+        if k % 1000 == 0:
+            print(f"{k} Iterations - performing evaluation on test set...")
+            g = (e) * 100
             correct = 0
             total_loss = 0
             for i in range(100):
-                numeral = train_set[k + i]
+                numeral = test_set[g + i]
                 label = int(numeral["label"])
 
                 image = numeral["image"]
@@ -100,7 +102,7 @@ def main():
                     correct +=1
                 loss = cross_entropy_loss(output, label)
                 total_loss += loss
-            print(f"Epoch {e+1} - Accuracy: {correct/100:.2%}, Average Loss: {total_loss/100:.4f}")
+            print(f"{k} Iterations - Accuracy: {correct/100:.2%}, Average Loss: {total_loss/100:.4f}")
             e+=1
 
         network.backpropagate_output_layer(expected_outputs, 0.001)
