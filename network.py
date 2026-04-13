@@ -459,82 +459,7 @@ class NeuralNetwork:
         for i, neuron in enumerate(self.output_layer):
             weights = [round(w, 3) for w in neuron.weights]
             bias = round(neuron.bias, 3)
-            print(f"  Neuron {i+1}: W={weights}, b={bias}")
-
-    def calculate_cost(self, inputs_array, expected_outputs_array):
-        """
-        Calculate the cost (loss) for a batch of data using Mean Squared Error.
-        
-        Cost = (1/2) * Σ(predicted_output - expected_output)²
-        
-        This measures how wrong the network's predictions are compared to the expected outputs.
-        Lower cost means better predictions.
-        
-        Args:
-            inputs_array (list): 2D list where each element is a list of input values
-                                Example: [[x1, y1], [x2, y2], [x3, y3]]
-            expected_outputs_array (list): 2D list where each element is a list of expected output values
-                                        Example: [[t1, f1], [t2, f2], [t3, f3]]
-            
-        Returns:
-            float: The calculated cost value
-            
-        Raises:
-            ValueError: If inputs_array and expected_outputs_array have different lengths
-        """
-
-        if len(inputs_array) != len(expected_outputs_array):
-            raise ValueError(f"Number of input samples ({len(inputs_array)}) must match number of output samples ({len(expected_outputs_array)})")
-    
-        total_cost = 0.0
-        
-        # Calculate cost for each data sample
-        for inputs, expected_outputs in zip(inputs_array, expected_outputs_array):
-            # Get the network's prediction for this input
-            predicted_outputs = self.forward(inputs)
-            
-            # Validate output dimensions
-            if len(predicted_outputs) != len(expected_outputs):
-                raise ValueError(f"Predicted outputs length ({len(predicted_outputs)}) doesn't match expected outputs length ({len(expected_outputs)})")
-            
-            # Calculate squared error for each output neuron
-            for predicted, expected in zip(predicted_outputs, expected_outputs):
-                error = predicted - expected
-                total_cost += error ** 2
-        
-        # Divide by 2 (as per MSE formula)
-        total_cost = total_cost / 2.0
-        
-        # Store the cost in the instance variable
-        self.cost = total_cost
-        
-        return total_cost
-    def calculate_single_cost(self, inputs, actual_outputs):
-        """
-        Calculate the cost for a single data point.
-        
-        Args:
-            data_point (DataPoint): Single DataPoint object
-            
-        Returns:
-            float: The cost for this single data point
-        """
-
-        # Get prediction
-        predicted_outputs = self.forward(inputs)
-        
-        if len(predicted_outputs) != len(actual_outputs):
-            raise ValueError(f"Predicted outputs length ({len(predicted_outputs)}) doesn't match expected outputs length ({len(expected_outputs)})")
-
-        # Calculate cost
-        cost = 0.0
-        for predicted, actual in zip(predicted_outputs, actual_outputs):
-            error = predicted - actual
-            cost += error ** 2
-        
-        cost = cost / 2.0
-        
-        return cost
+            print(f"  Neuron {i+1}: W={weights}, b={bias}")        
 
     
     def backpropagate_output_layer(self, expected_outputs, learning_rate=0.05):
@@ -578,6 +503,33 @@ class NeuralNetwork:
             if self.cost_function == 'cross-entropy':
                 # Calculate ∂Cost/∂activation using the cross-entropy cost function
                 neuron.node_value = predicted_output - expected_output
+            elif self.cost_function == 'mse':
+                # Calculate ∂Cost/∂activation
+                # For MSE cost = (1/2) * Σ(predicted - expected)²
+                # The derivative is: (predicted - expected)
+                cost_derivative = predicted_output - expected_output
+                
+                # Calculate ∂activation/∂(weighted_sum)
+                # This is the derivative of the activation function
+                activation_derivative = self.activation_derivative(
+                    neuron.last_weighted_sum,
+                    neuron.activation_function
+                )
+                
+                # Calculate node value using chain rule
+                # node_value = ∂Cost/∂activation × ∂activation/∂(weighted_sum)
+                neuron.node_value = cost_derivative * activation_derivative
+            else:
+                print(f"Warning: Unknown cost function '{self.cost_function}'. Defaulting to MSE.")
+                #Same as above
+                cost_derivative = predicted_output - expected_output
+                
+                activation_derivative = self.activation_derivative(
+                    neuron.last_weighted_sum,
+                    neuron.activation_function
+                )
+                
+                neuron.node_value = cost_derivative * activation_derivative
 
             # ============================================
             # UPDATE WEIGHTS AND BIAS FOR THIS OUTPUT NEURON

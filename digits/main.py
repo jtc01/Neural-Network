@@ -33,7 +33,8 @@ def main():
         output_size=10,
         hidden_activation='relu',
         output_activation='softmax',
-        random_seed=67
+        random_seed=67,
+        cost_function='cross-entropy'
     )
 
     k = 0
