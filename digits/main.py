@@ -1,10 +1,6 @@
 from network import NeuralNetwork
-from network import Neuron
 from datasets import load_dataset
 import math
-import random
-
-import network
 
 class DataPoint:
     def __init__(self, input=None, output=0):
