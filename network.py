@@ -237,7 +237,7 @@ class NeuralNetwork:
     3. Output layer produces final predictions
     """
     
-    def __init__(self, hidden_layers, input_size=2, output_size=2, hidden_activation='sigmoid', output_activation='sigmoid', random_seed=None):
+    def __init__(self, hidden_layers, input_size=2, output_size=2, hidden_activation='sigmoid', output_activation='sigmoid', random_seed=None, cost_function='mse'):
         """
         Initialize the neural network with random weights and biases.
         
@@ -255,6 +255,7 @@ class NeuralNetwork:
         self.hidden_layers_sizes = hidden_layers.copy()  # Store the architecture
         self.output_size = output_size
         self.num_hidden_layers = len(hidden_layers)
+        self.cost_function = cost_function
         
         # Store activation function types
         self.hidden_activation = hidden_activation
@@ -303,7 +304,6 @@ class NeuralNetwork:
             # Create the output neuron
             neuron = Neuron(weights=weights, bias=bias, activation_function=self.output_activation)
             self.output_layer.append(neuron)
-            #print(f"Output neuron {i+1}: weights={[round(w, 3) for w in weights]}, bias={round(bias, 3)}")
             
             # Store intermediate values for debugging and visualization
         self.last_inputs = None
@@ -330,7 +330,6 @@ class NeuralNetwork:
             list: List of output values (length 2)
         """
 
-        #print("=== Forward Pass ===")
 
         # Validate input size
 
@@ -366,15 +365,11 @@ class NeuralNetwork:
             final_outputs.append(output)
 
         if self.using_softmax:
-            #print(f"Original outputs {final_outputs}")
             # Apply softmax to the final outputs, assuming linear activation was used for output neurons
             max_output = max(final_outputs)  # For numerical stability
-            #print(f"Max output: {max_output}")
             exp_outputs = [math.exp(o - max_output) for o in final_outputs]  # Subtract max for stability
             sum_exp_outputs = sum(exp_outputs)
-            #print(f"Sum of exponentials: {sum_exp_outputs}")
             final_outputs = [exp_o / sum_exp_outputs for exp_o in exp_outputs]
-            #print(f"Softmax outputs: {final_outputs}")
         
         # Store final outputs for debugging
         self.last_outputs = final_outputs.copy()
@@ -580,8 +575,9 @@ class NeuralNetwork:
             # Get the expected output for this neuron
             expected_output = expected_outputs[neuron_idx]
             
-            # Calculate ∂Cost/∂activation using the cross-entropy cost function
-            neuron.node_value = predicted_output - expected_output
+            if self.cost_function == 'cross-entropy':
+                # Calculate ∂Cost/∂activation using the cross-entropy cost function
+                neuron.node_value = predicted_output - expected_output
 
             # ============================================
             # UPDATE WEIGHTS AND BIAS FOR THIS OUTPUT NEURON
