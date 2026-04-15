@@ -53,5 +53,21 @@ def main():
             total_forwards+=50
             print(f"{counter} | {total_forwards} | {incorrect}")
     
+    network.save("testing/network_state.json")
+
+    newNetwork = NeuralNetwork(
+        hidden_layers=[4],
+        input_size=2,
+        output_size=2,
+        hidden_activation='sigmoid',
+        output_activation='sigmoid',
+        random_seed=42
+    )
+    newNetwork.load("testing/network_state.json")
+    for point in data_points:
+        input=[point.x, point.y]
+        output=newNetwork.forward(input)
+        print(f"Output {output[0]} | Expected: {point.t} | Loss: {output[0]-point.t}")
+
 
 main()

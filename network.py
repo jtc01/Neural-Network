@@ -467,6 +467,87 @@ class NeuralNetwork:
                 
                 # Update bias using gradient descent
                 neuron.bias -= learning_rate * bias_gradient
+    def save(self, filename):
+        """
+        Save the network's weights and biases to a JSON file.
+
+        Args:
+            filename (str): Path to the JSON file to save to
+        """
+        import json
+
+        data = {
+            "hidden_layers": [],
+            "output_layer": []
+        }
+
+        # Save each hidden layer's weights and biases
+        for layer in self.hidden_layers:
+            layer_data = []
+            for neuron in layer:
+                layer_data.append({
+                    "weights": neuron.weights,
+                    "bias": neuron.bias
+                })
+            data["hidden_layers"].append(layer_data)
+
+        # Save output layer's weights and biases
+        for neuron in self.output_layer:
+            data["output_layer"].append({
+                "weights": neuron.weights,
+                "bias": neuron.bias
+            })
+
+        with open(filename, "w") as f:
+            json.dump(data, f, indent=4)
+        print(f"Network saved to {filename}")
+    
+    def load(self, filename):
+        """
+        Load weights and biases from a JSON file into the existing network.
+
+        Args:
+            filename (str): Path to the JSON file to load from
+        """
+        import json
+
+        with open(filename, "r") as f:
+            data = json.load(f)
+
+        if len(data["hidden_layers"]) != len(self.hidden_layers):
+            print(f"Failed to load network: expected {len(self.hidden_layers)} hidden layers, but file has {len(data['hidden_layers'])}")
+            return
+        
+        for layer_idx, layer_data in enumerate(data["hidden_layers"]):
+            if len(layer_data) != len(self.hidden_layers[layer_idx]):
+                print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx])} neurons in hidden layer {layer_idx+1}, but file has {len(layer_data)}")
+                return
+            for neuron_idx, neuron_data in enumerate(layer_data):
+                if len(neuron_data["weights"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
+                    print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} weights for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['weights'])}")
+                    return
+        
+        if len(data["output_layer"]) != len(self.output_layer):
+            print(f"Failed to load network: expected {len(self.output_layer)} neurons in output layer, but file has {len(data['output_layer'])}")
+            return
+        
+        for neuron_idx, neuron_data in enumerate(data["output_layer"]):
+            if len(neuron_data["weights"]) != len(self.output_layer[neuron_idx].weights):
+                print(f"Failed to load network: expected {len(self.output_layer[neuron_idx].weights)} weights for output neuron {neuron_idx+1}, but file has {len(neuron_data['weights'])}")
+                return
+
+        # Load hidden layer weights and biases
+        for layer_idx, layer_data in enumerate(data["hidden_layers"]):
+            for neuron_idx, neuron_data in enumerate(layer_data):
+                self.hidden_layers[layer_idx][neuron_idx].weights = neuron_data["weights"]
+                self.hidden_layers[layer_idx][neuron_idx].bias = neuron_data["bias"]
+
+        # Load output layer weights and biases
+        for neuron_idx, neuron_data in enumerate(data["output_layer"]):
+            self.output_layer[neuron_idx].weights = neuron_data["weights"]
+            self.output_layer[neuron_idx].bias = neuron_data["bias"]
+
+        print(f"Network loaded from {filename}")
         
 
 
