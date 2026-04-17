@@ -242,7 +242,7 @@ class NeuralNetwork:
             print(f"  Neuron {i+1}: W={weights}, b={bias}")        
 
     
-    def backpropagate_output_layer(self, expected_outputs, learning_rate=0.05):
+    def backpropagate_output_layer(self, expected_outputs, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0):
         """
         Calculate node values for the output layer neurons and update their weights and biases.
         
@@ -325,6 +325,8 @@ class NeuralNetwork:
                 
                 # Calculate gradient: ∂Cost/∂weight = node_value × input_value
                 weight_gradient = neuron.node_value * input_value
+
+                weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value)  # Clip gradients to prevent extreme updates
                 
                 # Update weight using gradient descent
                 neuron.weights[weight_idx] -= learning_rate * weight_gradient
@@ -332,6 +334,7 @@ class NeuralNetwork:
             # Update bias
             # Gradient for bias = node_value (since bias input is always 1)
             bias_gradient = neuron.node_value
+            bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value)  # Clip gradients to prevent extreme updates
             
             # Update bias using gradient descent
             neuron.bias -= learning_rate * bias_gradient
@@ -373,7 +376,7 @@ class NeuralNetwork:
             return activation * (1.0 - activation)
         
         
-    def backpropagate_hidden_layers(self, learning_rate=0.05):
+    def backpropagate_hidden_layers(self, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0):
         """
         Calculate node values for all hidden layer neurons using backpropagation,
         then update weights and biases.
@@ -456,6 +459,7 @@ class NeuralNetwork:
                     
                     # Calculate gradient: ∂Cost/∂weight = node_value × input_value
                     weight_gradient = neuron.node_value * input_value
+                    weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value)  # Clip gradients to prevent extreme updates
                     
                     # Update weight using gradient descent
                     neuron.weights[weight_idx] -= learning_rate * weight_gradient
@@ -464,6 +468,7 @@ class NeuralNetwork:
                 # Gradient for bias = node_value × 1 (since bias input is always 1)
                 # So bias_gradient = node_value
                 bias_gradient = neuron.node_value
+                bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value)  # Clip gradients to prevent extreme updates
                 
                 # Update bias using gradient descent
                 neuron.bias -= learning_rate * bias_gradient

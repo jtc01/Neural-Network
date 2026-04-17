@@ -18,7 +18,7 @@ def main():
         cost_function='cross-entropy'
     )
 
-    network.load("network_state_epoch_1.json")
+    network.load("network_state_epoch_2.json")
 
     k = 0
     while True:
@@ -40,15 +40,17 @@ def main():
         output = network.forward(inputs)
         result = output.index(max(output))
 
-        print(f"Test {k}: Label={label}, Predicted={result}")
-        for i in range(10):
-            if (int(label) == i):
-                print(f"  Class {i}: {output[i]:.2f} <--")
-            else:
-                print(f"  Class {i}: {output[i]:.2f}")
-        loss = cross_entropy_loss(output, index)
-        print(f"  Loss: {loss:.4f}\n")
-        k+=1
+        if k % 1000 == 0:
+            print(f"Test {k}: Label={label}, Predicted={result}")
+            for i in range(10):
+                if (int(label) == i):
+                    print(f"  Class {i}: {output[i]:.2f} <--")
+                else:
+                    print(f"  Class {i}: {output[i]:.2f}")
+            loss = cross_entropy_loss(output, index)
+            print(f"  Loss: {loss:.4f}\n")
+            k+=1
+            
         if k >= len(train_set):
             print("Testing completed.")
             break

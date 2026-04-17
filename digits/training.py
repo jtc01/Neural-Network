@@ -18,15 +18,16 @@ def main():
         cost_function='cross-entropy'
     )
 
-    network.load("network_state_epoch_1.json")
+    network.load("network_state_epoch_2.json")
 
     k = 0
     t=0
-    e=1
+    e=2
 
     streak = 0
 
     correct = 0
+    testing = False
 
     while True:
         inputs = []
@@ -68,7 +69,8 @@ def main():
         #print(f"network results: {results}")
         #print(f"expected_outputs: {expected_outputs}")
 
-        if k % 1000 == 0:
+
+        if k % 1000 == 0 and testing == True:
             print(f"{k} Iterations - performing evaluation on test set...")
             g = (t) * 100
             correct = 0
