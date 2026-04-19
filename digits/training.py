@@ -2,6 +2,8 @@ from network import NeuralNetwork
 from datasets import load_dataset
 import math
 
+# EPOCHS 1 and 2 work, 3, 4, and 5 do not. Need to retrain using leaky relu.
+
 def main():
 
     dataset = load_dataset("ylecun/mnist")
