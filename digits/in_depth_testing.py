@@ -21,6 +21,8 @@ def main():
     network.load("network_state_epoch_4.json")
 
     k = 0
+    correct = 0
+
     while True:
         inputs = []
         
@@ -39,6 +41,10 @@ def main():
 
         output = network.forward(inputs)
         result = output.index(max(output))
+
+
+        if k % 100 == 0:
+            print(f"{k} | {label} | {result}")
 
         if k % 1000 == 0:
             print(f"Test {k}: Label={label}, Predicted={result}")
