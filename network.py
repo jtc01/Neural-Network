@@ -360,6 +360,10 @@ class NeuralNetwork:
             # For ReLU: f'(z) = 1 if z > 0, else 0
             return 1.0 if weighted_sum > 0 else 0.0
         
+        elif activation_function == 'leaky_relu':
+            # For Leaky ReLU: f'(z) = 1 if z > 0, else 0.01
+            return 1.0 if weighted_sum > 0 else 0.01
+        
         elif activation_function == 'tanh':
             # For tanh: f'(z) = 1 - tanh²(z)
             tanh_value = math.tanh(weighted_sum)

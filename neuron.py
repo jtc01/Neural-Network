@@ -71,6 +71,21 @@ class Neuron:
         """
         return max(0.0, x)
     
+    def leaky_relu(self, x):
+        """
+        Leaky ReLU activation function: f(x) = max(0.01*x, x)
+        
+        This function allows a small gradient when the input is negative,
+        which can help prevent "dying ReLU" problems in deep networks.
+        
+        Args:
+            x (float): Input value to the activation function
+            
+        Returns:
+            float: Output value (0.01*x if input is negative, input value if positive)
+        """
+        return x if x > 0 else 0.01 * x
+    
     def tanh(self, x):
         """
         Hyperbolic tangent activation function: f(x) = tanh(x)
@@ -127,6 +142,8 @@ class Neuron:
             return self.sigmoid(x)
         elif self.activation_function == 'relu':
             return self.relu(x)
+        elif self.activation_function == 'leaky_relu':
+            return self.leaky_relu(x)
         elif self.activation_function == 'tanh':
             return self.tanh(x)
         elif self.activation_function == 'linear':

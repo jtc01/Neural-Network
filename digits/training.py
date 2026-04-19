@@ -12,7 +12,7 @@ def main():
         hidden_layers=[512, 256, 128],
         input_size=784,
         output_size=10,
-        hidden_activation='relu',
+        hidden_activation='leaky_relu',
         output_activation='softmax',
         random_seed=67,
         cost_function='cross-entropy'
@@ -61,9 +61,12 @@ def main():
 
         if k%100 == 0:
             print(f"{k} | {label} | {result}")
+            loss = cross_entropy_loss(output, label)
+            print(f"Cross-Entropy Loss: {loss:.4f}")
 
-        network.backpropagate_output_layer(expected_outputs, 0.0007)
-        network.backpropagate_hidden_layers(0.0007)
+
+        network.backpropagate_output_layer(expected_outputs, 0.0005)
+        network.backpropagate_hidden_layers(0.0005)
 
 
         #print(f"network results: {results}")
