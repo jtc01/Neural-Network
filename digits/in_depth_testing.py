@@ -12,16 +12,17 @@ def main():
         hidden_layers=[512, 256, 128],
         input_size=784,
         output_size=10,
-        hidden_activation='relu',
+        hidden_activation='leaky_relu',
         output_activation='softmax',
         random_seed=67,
         cost_function='cross-entropy'
     )
 
-    network.load("network_state_epoch_4.json")
+    network.load("network_state_epoch_3.json")
 
     k = 0
     correct = 0
+    total_loss = 0
 
     while True:
         inputs = []
@@ -41,12 +42,21 @@ def main():
 
         output = network.forward(inputs)
         result = output.index(max(output))
+        if index == result:
+            correct += 1
+
+        total_loss += cross_entropy_loss(output, index)
 
 
         if k % 100 == 0:
             print(f"{k} | {label} | {result}")
 
         if k % 1000 == 0:
+            if k > 0:
+                print(f"Accuracy from sample {k-1000} to {k}: {correct/1000:.2%}")
+                print(f"Average Cross-Entropy Loss from sample {k-1000} to {k}: {total_loss/1000:.4f}")
+            correct = 0
+            total_loss = 0
             print(f"Test {k}: Label={label}, Predicted={result}")
             for i in range(10):
                 if (int(label) == i):
@@ -55,7 +65,7 @@ def main():
                     print(f"  Class {i}: {output[i]:.2f}")
             loss = cross_entropy_loss(output, index)
             print(f"  Loss: {loss:.4f}\n")
-            k+=1
+        k+=1
             
         if k >= len(train_set):
             print("Testing completed.")

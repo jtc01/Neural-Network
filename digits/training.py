@@ -20,11 +20,11 @@ def main():
         cost_function='cross-entropy'
     )
 
-    network.load("network_state_epoch_2.json")
+    network.load("network_state_epoch_3.json")
 
     k = 0
     t=0
-    e=2
+    e=3
 
     streak = 0
 
@@ -67,8 +67,8 @@ def main():
             print(f"Cross-Entropy Loss: {loss:.4f}")
 
 
-        network.backpropagate_output_layer(expected_outputs, 0.0005)
-        network.backpropagate_hidden_layers(0.0005)
+        network.backpropagate_output_layer(expected_outputs, 0.0001)
+        network.backpropagate_hidden_layers(0.0001)
 
 
         #print(f"network results: {results}")
