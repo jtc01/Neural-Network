@@ -20,18 +20,23 @@ def main():
         cost_function='cross-entropy'
     )
 
-    network.load("network_state_epoch_3.json")
+    network.load("network_state_epoch_2.json")
 
     k = 0
     t=0
-    e=3
+    e=2
+
+    lr=0.0001
 
     streak = 0
 
     correct = 0
     testing = False
 
+    train_set.shuffle(seed=6767)
+
     while True:
+
         inputs = []
         
         numeral = train_set[k]
@@ -67,8 +72,8 @@ def main():
             print(f"Cross-Entropy Loss: {loss:.4f}")
 
 
-        network.backpropagate_output_layer(expected_outputs, 0.0001)
-        network.backpropagate_hidden_layers(0.0001)
+        network.backpropagate_output_layer(expected_outputs, lr)
+        network.backpropagate_hidden_layers(lr)
 
 
         #print(f"network results: {results}")
@@ -101,8 +106,10 @@ def main():
             t+=1
 
         if k >= len(train_set):
+            train_set.shuffle(seed=6767+e)
             e+=1
             k=0
+            lr *= 0.5
             print(f"Epoch {e} completed.")
             network.save(create_file_name(e))
 
