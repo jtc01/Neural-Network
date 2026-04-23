@@ -23,7 +23,9 @@ class Neuron:
             activation_function (str): Type of activation function to use
         """
         self.weights = weights if weights is not None else []
+        self.velocities = [0.0] * len(self.weights)  # For momentum-based updates
         self.bias = bias
+        self.bias_velocity = 0.0  # For momentum-based updates
         self.activation_function = activation_function
         
         # Store the last computed values for debugging purposes

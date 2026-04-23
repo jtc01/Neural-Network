@@ -66,6 +66,7 @@ class NeuralNetwork:
             for neuron_idx in range(layer_size):
                 # Generate random weights for connections to this neuron
                 weights = [random.gauss(0, math.sqrt(2/input_connections)) for _ in range(input_connections)]
+                velocities = [0.0] * len(weights)
                 bias = 0.0  # Initialize bias to 0 for better training stability
                 # Create the neuron and add it to the layer
                 neuron = Neuron(weights=weights, bias=bias, activation_function=hidden_activation)
@@ -242,7 +243,7 @@ class NeuralNetwork:
             print(f"  Neuron {i+1}: W={weights}, b={bias}")        
 
     
-    def backpropagate_output_layer(self, expected_outputs, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0):
+    def backpropagate_output_layer(self, expected_outputs, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9):
         """
         Calculate node values for the output layer neurons and update their weights and biases.
         
@@ -328,16 +329,22 @@ class NeuralNetwork:
 
                 weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value)  # Clip gradients to prevent extreme updates
                 
+                # Update velocity using momentum and gradient descent
+                neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * weight_gradient
+
                 # Update weight using gradient descent
-                neuron.weights[weight_idx] -= learning_rate * weight_gradient
+                neuron.weights[weight_idx] += neuron.velocities[weight_idx]
             
             # Update bias
             # Gradient for bias = node_value (since bias input is always 1)
             bias_gradient = neuron.node_value
             bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value)  # Clip gradients to prevent extreme updates
+
+            # Update bias velocity using momentum and gradient descent
+            neuron.bias_velocity = momentum * neuron.bias_velocity - learning_rate * bias_gradient
             
             # Update bias using gradient descent
-            neuron.bias -= learning_rate * bias_gradient
+            neuron.bias += neuron.bias_velocity
 
     def activation_derivative(self, weighted_sum, activation_function):
         """
@@ -380,7 +387,7 @@ class NeuralNetwork:
             return activation * (1.0 - activation)
         
         
-    def backpropagate_hidden_layers(self, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0):
+    def backpropagate_hidden_layers(self, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9):
         """
         Calculate node values for all hidden layer neurons using backpropagation,
         then update weights and biases.
@@ -465,17 +472,92 @@ class NeuralNetwork:
                     weight_gradient = neuron.node_value * input_value
                     weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value)  # Clip gradients to prevent extreme updates
                     
-                    # Update weight using gradient descent
-                    neuron.weights[weight_idx] -= learning_rate * weight_gradient
+                    # Update velocity using momentum and gradient descent
+                    neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * weight_gradient
+
+                    # Update weight using velocity
+                    neuron.weights[weight_idx] += neuron.velocities[weight_idx]
                 
                 # Update bias
                 # Gradient for bias = node_value × 1 (since bias input is always 1)
                 # So bias_gradient = node_value
                 bias_gradient = neuron.node_value
                 bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value)  # Clip gradients to prevent extreme updates
+
+                # Update bias velocity using momentum and gradient descent
+                neuron.bias_velocity = momentum * neuron.bias_velocity - learning_rate * bias_gradient
                 
                 # Update bias using gradient descent
-                neuron.bias -= learning_rate * bias_gradient
+                neuron.bias += neuron.bias_velocity
+
+    def train(self, data, epochs=1, initial_learning_rate=0.05, learning_rate_decay=1.0, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9):
+        """
+        Trains the network for a specified number of epochs on the given training data.
+
+        Args:
+            data (List): List of training samples, where each sample is a tuple (inputs, expected_outputs)
+            Each 'inputs' is a 1D list of input values in some normalized order, and each 'expected_outputs' is a list of expected output values.
+
+            epochs (int): Number of times to iterate through the entire training dataset
+            initial_learning_rate (float): The starting learning rate for weight updates
+            learning_rate_decay (float): Factor by which to decay the learning rate after each epoch (e.g., 0.95 for 5% decay per epoch)
+            print_rate (int): How often to print the results of a single training sample (accuracy, loss, distribution, etc.)
+            weight_clip_value (float): Maximum absolute value for weight gradients to prevent extreme updates
+            bias_clip_value (float): Maximum absolute value for bias gradients to prevent extreme updates
+            momentum (float): Momentum factor for weight and bias updates (0.0 means no momentum, 0.9 is common)
+
+        Returns:
+            None (the network's weights and biases are updated in place)
+        """
+
+        for epoch in range(epochs):
+            
+            total_accuracy = 0.0
+            total_loss = 0.0
+
+            local_accuracy_sum = 0.0
+            local_loss_sum = 0.0
+
+            lr = initial_learning_rate * (learning_rate_decay ** epoch)  # Decay learning rate each epoch
+            data.shuffle(seed=epoch)  # Shuffle data each epoch for better training
+
+            for idx, (inputs, expected_outputs) in enumerate(data):
+                self.forward(inputs)  # Forward pass to compute outputs and store intermediate values
+                self.backpropagate_output_layer(expected_outputs, learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum)
+                self.backpropagate_hidden_layers(learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum)
+
+                # Update accuracy sum for this sample
+                local_accuracy_sum += 1.0 if self.last_outputs.index(max(self.last_outputs)) == expected_outputs.index(max(expected_outputs)) else 0.0
+
+                # Update loss for calculation and printing
+                if self.cost_function == 'cross-entropy':
+                    local_loss_sum += -math.log(self.last_outputs[expected_outputs.index(max(expected_outputs))]) if self.last_outputs[expected_outputs.index(max(expected_outputs))] > 0 else float('inf')
+                elif self.cost_function == 'mse':
+                    local_loss_sum += 0.5 * sum((r - e) ** 2 for r, e in zip(self.last_outputs, expected_outputs))
+                else:
+                    local_loss_sum += 0.5 * sum((r - e) ** 2 for r, e in zip(self.last_outputs, expected_outputs))  # Default to MSE
+
+                if (idx + 1) % print_rate == 0:
+                    results = self.last_outputs
+                    predicted_label = results.index(max(results))
+                    expected_label = expected_outputs.index(max(expected_outputs))
+                    accuracy = 1.0 if predicted_label == expected_label else 0.0
+                    print(f"Epoch {epoch+1}, Sample {idx+1}: Network Result: {predicted_label} | Sample Label: {expected_label}")
+                    if self.cost_function == 'cross-entropy':
+                        loss = -math.log(results[expected_label]) if results[expected_label] > 0 else float('inf')
+                    elif self.cost_function == 'mse':
+                        loss = 0.5 * sum((r - e) ** 2 for r, e in zip(results, expected_outputs))
+                    else:
+                        loss = 0.5 * sum((r - e) ** 2 for r, e in zip(results, expected_outputs))  # Default to MSE
+                    print(f"Loss: {loss:.4f}")
+                    print(f"Output Distribution: {[round(r, 4) for r in results]}")
+                    print(f"Label Distribution: {[round(e, 4) for e in expected_outputs]}")
+
+                    print(f"Local Accuracy (last {print_rate} samples): {local_accuracy_sum / print_rate:.4f}")
+                    print(f"Local Loss (last {print_rate} samples): {local_loss_sum / print_rate:.4f}")
+                    print("-" * 30)
+
+
     def save(self, filename):
         """
         Save the network's weights and biases to a JSON file.
