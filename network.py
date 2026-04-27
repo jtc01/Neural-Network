@@ -1,6 +1,7 @@
 import math
 import random
 from neuron import Neuron
+from testing import data
 
 
 
@@ -519,7 +520,9 @@ class NeuralNetwork:
             local_loss_sum = 0.0
 
             lr = initial_learning_rate * (learning_rate_decay ** epoch)  # Decay learning rate each epoch
-            data.shuffle(seed=epoch)  # Shuffle data each epoch for better training
+            
+            random.seed(epoch)
+            random.shuffle(data)  # Shuffle data each epoch for better training
 
             for idx, (inputs, expected_outputs) in enumerate(data):
                 self.forward(inputs)  # Forward pass to compute outputs and store intermediate values
@@ -542,7 +545,7 @@ class NeuralNetwork:
                     predicted_label = results.index(max(results))
                     expected_label = expected_outputs.index(max(expected_outputs))
                     accuracy = 1.0 if predicted_label == expected_label else 0.0
-                    print(f"Epoch {epoch+1}, Sample {idx+1}: Network Result: {predicted_label} | Sample Label: {expected_label}")
+                    print(f"Epoach {epoch+1}, Sample {idx+1}: Network Result: {predicted_label} | Sample Label: {expected_label}")
                     if self.cost_function == 'cross-entropy':
                         loss = -math.log(results[expected_label]) if results[expected_label] > 0 else float('inf')
                     elif self.cost_function == 'mse':
