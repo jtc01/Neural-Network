@@ -244,7 +244,7 @@ class NeuralNetwork:
             print(f"  Neuron {i+1}: W={weights}, b={bias}")        
 
     
-    def backpropagate_output_layer(self, expected_outputs, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9):
+    def backpropagate_output_layer(self, expected_outputs, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, update_weights=True):
         """
         Calculate node values for the output layer neurons and update their weights and biases.
         
@@ -326,26 +326,30 @@ class NeuralNetwork:
                 input_value = neuron.last_inputs[weight_idx]
                 
                 # Calculate gradient: ∂Cost/∂weight = node_value × input_value
-                weight_gradient = neuron.node_value * input_value
+                neuron.weight_gradient_accumulations[weight_idx] += neuron.node_value * input_value
 
-                weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value)  # Clip gradients to prevent extreme updates
-                
-                # Update velocity using momentum and gradient descent
-                neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * weight_gradient
+                if update_weights:
 
-                # Update weight using gradient descent
-                neuron.weights[weight_idx] += neuron.velocities[weight_idx]
+                    weight_gradient = max(min(neuron.weight_gradient_accumulations[weight_idx], weight_clip_value), -weight_clip_value)  # Clip gradients to prevent extreme updates
+                    
+                    # Update velocity using momentum and gradient descent
+                    neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * weight_gradient
+
+                    # Update weight using velocity
+                    neuron.weights[weight_idx] += neuron.velocities[weight_idx]
             
             # Update bias
             # Gradient for bias = node_value (since bias input is always 1)
-            bias_gradient = neuron.node_value
-            bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value)  # Clip gradients to prevent extreme updates
+            neuron.bias_gradient_accumulation += neuron.node_value
 
-            # Update bias velocity using momentum and gradient descent
-            neuron.bias_velocity = momentum * neuron.bias_velocity - learning_rate * bias_gradient
-            
-            # Update bias using gradient descent
-            neuron.bias += neuron.bias_velocity
+            if update_weights:
+                bias_gradient = max(min(neuron.bias_gradient_accumulation, bias_clip_value), -bias_clip_value)  # Clip gradients to prevent extreme updates
+
+                # Update bias velocity using momentum and gradient descent
+                neuron.bias_velocity = momentum * neuron.bias_velocity - learning_rate * bias_gradient
+                
+                # Update bias using gradient descent
+                neuron.bias += neuron.bias_velocity
 
     def activation_derivative(self, weighted_sum, activation_function):
         """
@@ -388,7 +392,7 @@ class NeuralNetwork:
             return activation * (1.0 - activation)
         
         
-    def backpropagate_hidden_layers(self, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9):
+    def backpropagate_hidden_layers(self, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, update_weights=True):
         """
         Calculate node values for all hidden layer neurons using backpropagation,
         then update weights and biases.
@@ -470,28 +474,31 @@ class NeuralNetwork:
                     input_value = neuron.last_inputs[weight_idx]
                     
                     # Calculate gradient: ∂Cost/∂weight = node_value × input_value
-                    weight_gradient = neuron.node_value * input_value
-                    weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value)  # Clip gradients to prevent extreme updates
+                    neuron.weight_gradient_accumulations[weight_idx] += neuron.node_value * input_value
                     
-                    # Update velocity using momentum and gradient descent
-                    neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * weight_gradient
+                    if update_weights:
+                        weight_gradient = max(min(neuron.weight_gradient_accumulations[weight_idx], weight_clip_value), -weight_clip_value)  # Clip gradients to prevent extreme updates
 
-                    # Update weight using velocity
-                    neuron.weights[weight_idx] += neuron.velocities[weight_idx]
+                        # Update velocity using momentum and gradient descent
+                        neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * weight_gradient
+
+                        # Update weight using velocity
+                        neuron.weights[weight_idx] += neuron.velocities[weight_idx]
                 
                 # Update bias
                 # Gradient for bias = node_value × 1 (since bias input is always 1)
                 # So bias_gradient = node_value
-                bias_gradient = neuron.node_value
-                bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value)  # Clip gradients to prevent extreme updates
+                neuron.bias_gradient_accumulation += neuron.node_value
+                if update_weights:
+                    bias_gradient = max(min(neuron.bias_gradient_accumulation, bias_clip_value), -bias_clip_value)  # Clip gradients to prevent extreme updates
 
-                # Update bias velocity using momentum and gradient descent
-                neuron.bias_velocity = momentum * neuron.bias_velocity - learning_rate * bias_gradient
-                
-                # Update bias using gradient descent
-                neuron.bias += neuron.bias_velocity
+                    # Update bias velocity using momentum and gradient descent
+                    neuron.bias_velocity = momentum * neuron.bias_velocity - learning_rate * bias_gradient
+                    
+                    # Update bias using gradient descent
+                    neuron.bias += neuron.bias_velocity
 
-    def train(self, data, epochs=1, initial_learning_rate=0.05, learning_rate_decay=1.0, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9):
+    def train(self, data, epochs=1, initial_learning_rate=0.005, learning_rate_decay=1.0, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, batch_size=1):
         """
         Trains the network for a specified number of epochs on the given training data.
 
@@ -526,8 +533,12 @@ class NeuralNetwork:
 
             for idx, (inputs, expected_outputs) in enumerate(data):
                 self.forward(inputs)  # Forward pass to compute outputs and store intermediate values
-                self.backpropagate_output_layer(expected_outputs, learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum)
-                self.backpropagate_hidden_layers(learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum)
+                if idx + 1 % batch_size == 0:
+                    self.backpropagate_output_layer(expected_outputs, learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=True)
+                    self.backpropagate_hidden_layers(learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=True)
+                else:
+                    self.backpropagate_output_layer(expected_outputs, learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=False)
+                    self.backpropagate_hidden_layers(learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=False)
 
                 # Update accuracy sum for this sample
                 local_accuracy_sum += 1.0 if self.last_outputs.index(max(self.last_outputs)) == expected_outputs.index(max(expected_outputs)) else 0.0
@@ -553,12 +564,15 @@ class NeuralNetwork:
                     else:
                         loss = 0.5 * sum((r - e) ** 2 for r, e in zip(results, expected_outputs))  # Default to MSE
                     print(f"Loss: {loss:.4f}")
-                    print(f"Output Distribution: {[round(r, 4) for r in results]}")
-                    print(f"Label Distribution: {[round(e, 4) for e in expected_outputs]}")
+                    print(f"Output Distribution: [{', '.join(f'{r:.4f}' for r in results)}]")
+                    print(f"Label Distribution:  [{', '.join(f'{e:.4f}' for e in expected_outputs)}]")
 
-                    print(f"Local Accuracy (last {print_rate} samples): {local_accuracy_sum / print_rate:.4f}")
+                    print(f"Local Accuracy (last {print_rate} samples): {local_accuracy_sum * 100 / print_rate:.4f}%")
                     print(f"Local Loss (last {print_rate} samples): {local_loss_sum / print_rate:.4f}")
                     print("-" * 30)
+
+                    local_accuracy_sum = 0.0
+                    local_loss_sum = 0.0
 
 
     def save(self, filename):
@@ -618,7 +632,7 @@ class NeuralNetwork:
                 return
             for neuron_idx, neuron_data in enumerate(layer_data):
                 if len(neuron_data["weights"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
-                    print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} weights for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['weights'])}")
+                    print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} weights for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['weights'])}")# Thats one long line of code
                     return
         
         if len(data["output_layer"]) != len(self.output_layer):

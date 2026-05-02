@@ -1,4 +1,4 @@
-from random import random
+import random
 
 from network import NeuralNetwork
 import math
@@ -33,7 +33,7 @@ def main():
     correct = 0
     testing = False
 
-    network.train(train_data, epochs=1, initial_learning_rate=0.05, learning_rate_decay=0.8, print_rate=100, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9)
+    network.train(train_data, epochs=1, initial_learning_rate=0.0005, learning_rate_decay=0.8, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9)
 
 def create_file_name(epoch):
     return f"network_state_epoch_{epoch}.json"

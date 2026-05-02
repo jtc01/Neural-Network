@@ -26,6 +26,8 @@ class Neuron:
         self.velocities = [0.0] * len(self.weights)  # For momentum-based updates
         self.bias = bias
         self.bias_velocity = 0.0  # For momentum-based updates
+        self.weight_gradient_accumulations = [0.0] * len(self.weights)  # For accumulating gradients during backpropagation
+        self.bias_gradient_accumulation = 0.0  # For accumulating bias gradients during backpropagation
         self.activation_function = activation_function
         
         # Store the last computed values for debugging purposes
