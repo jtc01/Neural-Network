@@ -159,7 +159,7 @@ class Neuron:
             print(f"Warning: Unknown activation function '{self.activation_function}'. Using sigmoid.")
             return self.sigmoid(x)
     
-    def forward(self, inputs):
+    def forward(self, inputs, dropout_rate=0.0):
         """
         Perform the forward pass through the neuron.
         
@@ -199,9 +199,12 @@ class Neuron:
         # Store the weighted sum for debugging
         self.last_weighted_sum = weighted_sum
         
-        # Step 3: Apply the activation function
+        # Step 3: Check for dropout and apply the activation function
         # This introduces non-linearity to the neuron's output
-        output = self.apply_activation(weighted_sum)
+        if random.random() < dropout_rate:
+            output = 0.0
+        else:
+            output = self.apply_activation(weighted_sum) * (1.0 / (1.0 - dropout_rate))  # Scale output to maintain expected value
         
         # Store the output for debugging
         self.last_output = output

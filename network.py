@@ -94,7 +94,7 @@ class NeuralNetwork:
 
         self.cost = 0.0
     
-    def forward(self, inputs):
+    def forward(self, inputs, dropout_rate=0.0):
         """
         Perform forward propagation through the entire network.
         
@@ -130,7 +130,7 @@ class NeuralNetwork:
             
             # Process current inputs through each neuron in this layer
             for neuron in layer:
-                output = neuron.forward(current_inputs)
+                output = neuron.forward(current_inputs, dropout_rate=dropout_rate)
                 layer_outputs.append(output)
             
             # Store this layer's outputs for debugging
@@ -498,7 +498,7 @@ class NeuralNetwork:
                     # Update bias using gradient descent
                     neuron.bias += neuron.bias_velocity
 
-    def train(self, data, epochs=1, initial_learning_rate=0.005, learning_rate_decay=1.0, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, batch_size=1):
+    def train(self, data, epochs=1, initial_learning_rate=0.005, learning_rate_decay=1.0, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, batch_size=1, dropout_rate=0.0):
         """
         Trains the network for a specified number of epochs on the given training data.
 
