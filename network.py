@@ -243,6 +243,66 @@ class NeuralNetwork:
             bias = round(neuron.bias, 3)
             print(f"  Neuron {i+1}: W={weights}, b={bias}")        
 
+    def compute_output_node_values(self, expected_outputs):
+        """
+        Calculate node values for the output layer neurons based on the expected outputs.
+
+        For the output layer, the node value is:
+        node_value = ∂Cost/∂(weighted_sum)
+                    = ∂Cost/∂activation × ∂activation/∂(weighted_sum)
+        
+        Where:
+        - ∂Cost/∂activation = (predicted_output - expected_output)  [from MSE cost function]
+        - ∂activation/∂(weighted_sum) = activation_derivative(weighted_sum)
+
+        expected_outputs (list): The expected output values for this data point
+                                    Example: [1, 0] or [0, 1]
+        
+        Returns:
+            None (stores node values in each output neuron)
+        """
+        if len(expected_outputs) != len(self.output_layer):
+            raise ValueError(f"Expected {len(self.output_layer)} output values, got {len(expected_outputs)}")
+        
+        # Calculate node value for each output neuron
+        for neuron_idx, neuron in enumerate(self.output_layer):
+            # Get the predicted output (activation) for this neuron
+            predicted_output = neuron.last_output
+            
+            # Get the expected output for this neuron
+            expected_output = expected_outputs[neuron_idx]
+            
+            if self.cost_function == 'cross-entropy':
+                # Calculate ∂Cost/∂activation using the cross-entropy cost function
+                neuron.node_value = predicted_output - expected_output
+            elif self.cost_function == 'mse':
+                # Calculate ∂Cost/∂activation
+                # For MSE cost = (1/2) * Σ(predicted - expected)²
+                # The derivative is: (predicted - expected)
+                cost_derivative = predicted_output - expected_output
+                
+                # Calculate ∂activation/∂(weighted_sum)
+                # This is the derivative of the activation function
+                activation_derivative = self.activation_derivative(
+                    neuron.last_weighted_sum,
+                    neuron.activation_function
+                )
+                
+                # Calculate node value using chain rule
+                # node_value = ∂Cost/∂activation × ∂activation/∂(weighted_sum)
+                neuron.node_value = cost_derivative * activation_derivative
+            else:
+                print(f"Warning: Unknown cost function '{self.cost_function}'. Defaulting to MSE.")
+                #Same as above
+                cost_derivative = predicted_output - expected_output
+                
+                activation_derivative = self.activation_derivative(
+                    neuron.last_weighted_sum,
+                    neuron.activation_function
+                )
+                
+                neuron.node_value = cost_derivative * activation_derivative        
+
     
     def backpropagate_output_layer(self, expected_outputs, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, update_weights=True):
         """
@@ -391,7 +451,67 @@ class NeuralNetwork:
             activation = 1.0 / (1.0 + math.exp(-weighted_sum)) if -500 < weighted_sum < 500 else (1.0 if weighted_sum > 0 else 0.0)
             return activation * (1.0 - activation)
         
+    def compute_hidden_node_values(self):
+        """
+        Calculate node values for all hidden layer neurons using backpropagation.
+        This method works backwards through the hidden layers, starting from the layer closest to the output and moving towards the input.
         
+        For each hidden neuron, the node value is:
+        node_value = activation_derivative(weighted_sum) × Σ(weight_to_next × node_value_next)
+
+        Prerequisites:
+        - forward() must have been called (so neurons have last_weighted_sum and last_inputs values)
+        - backpropagate_output_layer() must have been called first
+
+        Args:
+            None (uses stored values in neurons)
+
+        Returns:
+            None (stores node values in each hidden neuron)
+        """
+
+        # Process hidden layers in reverse order (from output back to input)
+        # Start from the last hidden layer and move backwards
+        for layer_idx in range(len(self.hidden_layers) - 1, -1, -1):
+            current_layer = self.hidden_layers[layer_idx]
+            
+            # Determine which layer comes after this one
+            if layer_idx == len(self.hidden_layers) - 1:
+                # This is the last hidden layer, so next layer is output layer
+                next_layer = self.output_layer
+            else:
+                # Next layer is the following hidden layer
+                next_layer = self.hidden_layers[layer_idx + 1]
+            
+            # Calculate node value for each neuron in this layer
+            for neuron_idx, neuron in enumerate(current_layer):
+                # Initialize node value to 0
+                node_value = 0.0
+                
+                # Sum contributions from ALL neurons in the next layer
+                for next_neuron_idx, next_neuron in enumerate(next_layer):
+                    # Get the weight connecting this neuron to the next neuron
+                    # The weight is stored in the next neuron's weights array
+                    # at the index corresponding to this neuron's position
+                    weight_to_next = next_neuron.weights[neuron_idx]
+                    
+                    # Get the node value of the next neuron (already calculated)
+                    next_node_value = next_neuron.node_value
+                    
+                    # Add this contribution to the sum
+                    node_value += weight_to_next * next_node_value
+                
+                # Multiply by the activation derivative for this neuron
+                activation_deriv = self.activation_derivative(
+                    neuron.last_weighted_sum,
+                    neuron.activation_function
+                )
+                
+                node_value *= activation_deriv
+                
+                # Store the calculated node value in the neuron
+                neuron.node_value = node_value
+
     def backpropagate_hidden_layers(self, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, update_weights=True):
         """
         Calculate node values for all hidden layer neurons using backpropagation,
@@ -498,6 +618,9 @@ class NeuralNetwork:
                     # Update bias using gradient descent
                     neuron.bias += neuron.bias_velocity
 
+    def accumulate_gradients(self, expected_outputs):
+        
+
     def train(self, data, epochs=1, initial_learning_rate=0.005, learning_rate_decay=1.0, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, batch_size=1, dropout_rate=0.0):
         """
         Trains the network for a specified number of epochs on the given training data.
@@ -573,6 +696,83 @@ class NeuralNetwork:
 
                     local_accuracy_sum = 0.0
                     local_loss_sum = 0.0
+    
+    def train_adam(self, data, epochs=1, initial_learning_rate=0.005, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, squared_gradient_term=0.999, batch_size=1, dropout_rate=0.0):
+        """
+        Trains the network for a specified number of epochs on the given training data.
+
+        Args:
+            data (List): List of training samples, where each sample is a tuple (inputs, expected_outputs)
+            Each 'inputs' is a 1D list of input values in some normalized order, and each 'expected_outputs' is a list of expected output values.
+
+            epochs (int): Number of times to iterate through the entire training dataset
+            initial_learning_rate (float): The starting learning rate for weight updates
+            learning_rate_decay (float): Factor by which to decay the learning rate after each epoch (e.g., 0.95 for 5% decay per epoch)
+            print_rate (int): How often to print the results of a single training sample (accuracy, loss, distribution, etc.)
+            weight_clip_value (float): Maximum absolute value for weight gradients to prevent extreme updates
+            bias_clip_value (float): Maximum absolute value for bias gradients to prevent extreme updates
+            momentum (float): Momentum factor for weight and bias updates (0.0 means no momentum, 0.9 is common)
+
+        Returns:
+            None (the network's weights and biases are updated in place)
+        """
+
+        for epoch in range(epochs):
+            
+            total_accuracy = 0.0
+            total_loss = 0.0
+
+            local_accuracy_sum = 0.0
+            local_loss_sum = 0.0
+
+            lr = initial_learning_rate  # Adam uses adaptive learning rates, so we don't decay it here
+
+            random.seed(epoch)
+            random.shuffle(data)  # Shuffle data each epoch for better training
+
+            for idx, (inputs, expected_outputs) in enumerate(data):
+                self.forward(inputs)  # Forward pass to compute outputs and store intermediate values
+                if idx + 1 % batch_size == 0:
+                    self.backpropagate_output_layer(expected_outputs, learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=True)
+                    self.backpropagate_hidden_layers(learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=True)
+                else:
+                    self.backpropagate_output_layer(expected_outputs, learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=False)
+                    self.backpropagate_hidden_layers(learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=False)
+
+                # Update accuracy sum for this sample
+                local_accuracy_sum += 1.0 if self.last_outputs.index(max(self.last_outputs)) == expected_outputs.index(max(expected_outputs)) else 0.0
+
+                # Update loss for calculation and printing
+                if self.cost_function == 'cross-entropy':
+                    local_loss_sum += -math.log(self.last_outputs[expected_outputs.index(max(expected_outputs))]) if self.last_outputs[expected_outputs.index(max(expected_outputs))] > 0 else float('inf')
+                elif self.cost_function == 'mse':
+                    local_loss_sum += 0.5 * sum((r - e) ** 2 for r, e in zip(self.last_outputs, expected_outputs))
+                else:
+                    local_loss_sum += 0.5 * sum((r - e) ** 2 for r, e in zip(self.last_outputs, expected_outputs))  # Default to MSE
+
+                if (idx + 1) % print_rate == 0:
+                    results = self.last_outputs
+                    predicted_label = results.index(max(results))
+                    expected_label = expected_outputs.index(max(expected_outputs))
+                    accuracy = 1.0 if predicted_label == expected_label else 0.0
+                    print(f"Epoach {epoch+1}, Sample {idx+1}: Network Result: {predicted_label} | Sample Label: {expected_label}")
+                    if self.cost_function == 'cross-entropy':
+                        loss = -math.log(results[expected_label]) if results[expected_label] > 0 else float('inf')
+                    elif self.cost_function == 'mse':
+                        loss = 0.5 * sum((r - e) ** 2 for r, e in zip(results, expected_outputs))
+                    else:
+                        loss = 0.5 * sum((r - e) ** 2 for r, e in zip(results, expected_outputs))  # Default to MSE
+                    print(f"Loss: {loss:.4f}")
+                    print(f"Output Distribution: [{', '.join(f'{r:.4f}' for r in results)}]")
+                    print(f"Label Distribution:  [{', '.join(f'{e:.4f}' for e in expected_outputs)}]")
+
+                    print(f"Local Accuracy (last {print_rate} samples): {local_accuracy_sum * 100 / print_rate:.4f}%")
+                    print(f"Local Loss (last {print_rate} samples): {local_loss_sum / print_rate:.4f}")
+                    print("-" * 30)
+
+                    local_accuracy_sum = 0.0
+                    local_loss_sum = 0.0
+
 
 
     def save(self, filename):
