@@ -618,8 +618,149 @@ class NeuralNetwork:
                     # Update bias using gradient descent
                     neuron.bias += neuron.bias_velocity
 
-    def accumulate_gradients(self, expected_outputs):
+    def accumulate_gradients(self):
+        """
+        Accumulate gradients for all neurons in the network after backpropagation.
         
+        This method should be called after compute_output_node_values() and compute_hidden_node_values() to accumulate the gradients for all neurons based on their node values and inputs.
+        Args:
+            None (uses stored values in neurons)
+        Returns:
+            None (stores accumulated gradients in each neuron)
+        """
+        for neuron in self.output_layer:
+            for weight_idx in range(len(neuron.weights)):
+                input_value = neuron.last_inputs[weight_idx]
+                neuron.weight_gradient_accumulations[weight_idx] += neuron.node_value * input_value
+            neuron.bias_gradient_accumulation += neuron.node_value
+        for layer in self.hidden_layers:
+            for neuron in layer:
+                for weight_idx in range(len(neuron.weights)):
+                    input_value = neuron.last_inputs[weight_idx]
+                    neuron.weight_gradient_accumulations[weight_idx] += neuron.node_value * input_value
+                neuron.bias_gradient_accumulation += neuron.node_value
+    
+    def update_weights_sgd(self, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9):
+        """
+        Updates the weights and biases of all neurons in the network using
+        Stochastic Gradient Descent (SGD). This function directly applies the
+        gradient stored in each neuron to its weights and biases, scaled by the
+        learning rate. This is the simplest weight update method and is best
+        suited for single-sample training without mini-batches.
+
+        This function should be called after compute_output_gradients() and
+        compute_hidden_gradients() have been called to ensure that each neuron
+        has a valid node value before updating.
+
+        Args:
+            learning_rate (float): The scaling factor for the gradient update.
+                                Smaller values (e.g. 0.001) make the network
+                                learn more slowly but more reliably. Larger
+                                values (e.g. 0.01) learn faster but risk
+                                overshooting.
+            clip (float or None):  If provided, gradients are clamped to the
+                                range [-clip, clip] before being applied.
+                                Helps prevent exploding gradients. If None,
+                                no clipping is applied.
+
+        Returns:
+            None: Weights and biases are updated directly inside each neuron.
+        """
+        
+        for neuron in self.output_layer:
+            # Update each weight in output layer
+            for weight_idx in range(len(neuron.weights)):
+                input_value = neuron.last_inputs[weight_idx]
+                weight_gradient = neuron.node_value * input_value
+                weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else weight_gradient  # Clip gradients if clip value is provided
+                neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * weight_gradient
+                neuron.weights[weight_idx] += neuron.velocities[weight_idx]
+
+            # Update bias in output layer
+            bias_gradient = neuron.node_value
+            bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else bias_gradient  # Clip gradients if clip value is provided
+            neuron.bias_velocity = momentum * neuron.bias_velocity - learning_rate * bias_gradient
+            neuron.bias += neuron.bias_velocity
+
+        for layer in self.hidden_layers:
+            for neuron in layer:
+                # Update each weight in hidden layers
+                for weight_idx in range(len(neuron.weights)):
+                    input_value = neuron.last_inputs[weight_idx]
+                    weight_gradient = neuron.node_value * input_value
+                    weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else weight_gradient  # Clip gradients if clip value is provided
+                    neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * weight_gradient
+                    neuron.weights[weight_idx] += neuron.velocities[weight_idx]
+
+                # Update bias in hidden layers
+                bias_gradient = neuron.node_value
+                bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else bias_gradient  # Clip gradients if clip value is provided
+                neuron.bias_velocity = momentum * neuron.bias_velocity - learning_rate * bias_gradient
+                neuron.bias += neuron.bias_velocity
+    
+    def apply_gradient_accumulations_sgd(self, learning_rate=0.05, batch_size=1, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9):
+        """
+        Updates the weights and biases of all neurons in the network using the
+        average of the gradients accumulated over a mini-batch, via Stochastic
+        Gradient Descent (SGD). Rather than updating weights after every single
+        sample, mini-batch training accumulates gradients across multiple samples
+        and averages them before applying the update. This produces more stable
+        gradient estimates and generally leads to better training.
+
+        This function should be called after accumulate_gradients() has been
+        called once for each sample in the mini-batch. After calling this
+        function, reset_accumulated_gradients() should be called before
+        processing the next mini-batch.
+
+        Args:
+            learning_rate (float): The scaling factor for the gradient update.
+                                Smaller values (e.g. 0.001) make the network
+                                learn more slowly but more reliably. Larger
+                                values (e.g. 0.01) learn faster but risk
+                                overshooting.
+            batch_size (int):      The number of samples in the mini-batch. Used
+                                to average the accumulated gradients before
+                                applying the update.
+            clip (float or None):  If provided, gradients are clamped to the
+                                range [-clip, clip] before being applied.
+                                Helps prevent exploding gradients. If None,
+                                no clipping is applied.
+
+        Returns:
+            None: Weights and biases are updated directly inside each neuron.
+                Accumulated gradients are not reset by this function and must
+                be reset manually by calling reset_accumulated_gradients().
+        """
+        for neuron in self.output_layer:
+            # Update each weight in output layer
+            for weight_idx in range(len(neuron.weights)):
+                avg_weight_gradient = neuron.weight_gradient_accumulations[weight_idx] / batch_size
+                avg_weight_gradient = max(min(avg_weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else avg_weight_gradient  # Clip gradients if clip value is provided
+                neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * avg_weight_gradient
+                neuron.weights[weight_idx] += neuron.velocities[weight_idx]
+
+            # Update bias in output layer
+            avg_bias_gradient = neuron.bias_gradient_accumulation / batch_size
+            avg_bias_gradient = max(min(avg_bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else avg_bias_gradient  # Clip gradients if clip value is provided
+            neuron.bias_velocity = momentum * neuron.bias_velocity - learning_rate * avg_bias_gradient
+            neuron.bias += neuron.bias_velocity
+
+        for layer in self.hidden_layers:
+            for neuron in layer:
+                # Update each weight in hidden layers
+                for weight_idx in range(len(neuron.weights)):
+                    avg_weight_gradient = neuron.weight_gradient_accumulations[weight_idx] / batch_size
+                    avg_weight_gradient = max(min(avg_weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else avg_weight_gradient  # Clip gradients if clip value is provided
+                    neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * avg_weight_gradient
+                    neuron.weights[weight_idx] += neuron.velocities[weight_idx]
+
+                # Update bias in hidden layers
+                avg_bias_gradient = neuron.bias_gradient_accumulation / batch_size
+                avg_bias_gradient = max(min(avg_bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else avg_bias_gradient  # Clip gradients if clip value is provided
+                neuron.bias_velocity = momentum * neuron.bias_velocity - learning_rate * avg_bias_gradient
+                neuron.bias += neuron.bias_velocity
+
+    
 
     def train(self, data, epochs=1, initial_learning_rate=0.005, learning_rate_decay=1.0, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, batch_size=1, dropout_rate=0.0):
         """
