@@ -831,6 +831,89 @@ class NeuralNetwork:
                 bias_velocity_corrected = neuron.bias_velocity / (1 - momentum)
                 bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulation / (1 - squared_gradient_term)
                 neuron.bias -= learning_rate * bias_velocity_corrected / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
+    
+    def apply_gradient_accumulations_adam(self, learning_rate=0.001, batch_size=1, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, squared_gradient_term=0.999):
+        """
+        Updates the weights and biases of all neurons in the network using the
+        average of the gradients accumulated over a mini-batch, via the Adam
+        optimization algorithm. Rather than updating weights after every single
+        sample, mini-batch training accumulates gradients across multiple samples
+        and averages them before applying the update. This produces more stable
+        gradient estimates and generally leads to better training.
+
+        This function should be called after accumulate_gradients() has been
+        called once for each sample in the mini-batch. After calling this
+        function, reset_accumulated_gradients() should be called before
+        processing the next mini-batch.
+
+        Args:
+            learning_rate (float): The base learning rate for Adam updates.
+            batch_size (int): The number of samples in the mini-batch. Used to
+                average the accumulated gradients before applying the update.
+            weight_clip_value (float or None): If provided, weight gradients are
+                clamped to the range [-weight_clip_value, weight_clip_value]
+                before being applied. Helps prevent exploding gradients. If None,
+                no clipping is applied.
+            bias_clip_value (float or None): If provided, bias gradients are
+                clamped to the range [-bias_clip_value, bias_clip_value] before
+                being applied. Helps prevent exploding gradients. If None, no
+                clipping is applied.
+        """
+
+        for neuron in self.output_layer:
+            for weight_idx in range(len(neuron.weights)):
+                avg_weight_gradient = neuron.weight_gradient_accumulations[weight_idx] / batch_size
+                avg_weight_gradient = max(min(avg_weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else avg_weight_gradient  # Clip gradients if clip value is provided
+
+                # Update first moment (velocity)
+                neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * avg_weight_gradient
+
+                # Update second moment (squared gradient)
+                neuron.squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
+
+                # Compute bias-corrected moments
+                velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
+                squared_gradient_corrected = neuron.squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
+
+                # Update weight using Adam update rule
+                neuron.weights[weight_idx] -= learning_rate * velocity_corrected / (math.sqrt(squared_gradient_corrected) + 1e-8)
+
+            # Update bias in output layer
+            avg_bias_gradient = neuron.bias_gradient_accumulation / batch_size
+            avg_bias_gradient = max(min(avg_bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else avg_bias_gradient  # Clip gradients if clip value is provided
+            neuron.bias_velocity = momentum * neuron.bias_velocity + (1 - momentum) * avg_bias_gradient
+            neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (avg_bias_gradient ** 2)
+            bias_velocity_corrected = neuron.bias_velocity / (1 - momentum)
+            bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulation / (1 - squared_gradient_term)
+            neuron.bias -= learning_rate * bias_velocity_corrected / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
+
+        for layer in self.hidden_layers:
+            for neuron in layer:
+                for weight_idx in range(len(neuron.weights)):
+                    avg_weight_gradient = neuron.weight_gradient_accumulations[weight_idx] / batch_size
+                    avg_weight_gradient = max(min(avg_weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else avg_weight_gradient  # Clip gradients if clip value is provided
+
+                    # Update first moment (velocity)
+                    neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * avg_weight_gradient
+
+                    # Update second moment (squared gradient)
+                    neuron.squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
+
+                    # Compute bias-corrected moments
+                    velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
+                    squared_gradient_corrected = neuron.squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
+
+                    # Update weight using Adam update rule
+                    neuron.weights[weight_idx] -= learning_rate * velocity_corrected / (math.sqrt(squared_gradient_corrected) + 1e-8)
+
+                # Update bias in hidden layers
+                avg_bias_gradient = neuron.bias_gradient_accumulation / batch_size
+                avg_bias_gradient = max(min(avg_bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else avg_bias_gradient  # Clip gradients if clip value is provided
+                neuron.bias_velocity = momentum * neuron.bias_velocity + (1 - momentum) * avg_bias_gradient
+                neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (avg_bias_gradient ** 2)
+                bias_velocity_corrected = neuron.bias_velocity / (1 - momentum)
+                bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulation / (1 - squared_gradient_term)
+                neuron.bias -= learning_rate * bias_velocity_corrected / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
 
     def train(self, data, epochs=1, initial_learning_rate=0.005, learning_rate_decay=1.0, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, batch_size=1, dropout_rate=0.0):
         """
@@ -943,12 +1026,11 @@ class NeuralNetwork:
 
             for idx, (inputs, expected_outputs) in enumerate(data):
                 self.forward(inputs)  # Forward pass to compute outputs and store intermediate values
+                self.compute_output_node_values(expected_outputs)  # Compute node values for output layer based on expected outputs
+                self.compute_hidden_node_values()  # Compute node values for hidden layers based on output layer
+                self.accumulate_gradients()  # Accumulate gradients for this sample
                 if idx + 1 % batch_size == 0:
-                    self.backpropagate_output_layer(expected_outputs, learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=True)
-                    self.backpropagate_hidden_layers(learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=True)
-                else:
-                    self.backpropagate_output_layer(expected_outputs, learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=False)
-                    self.backpropagate_hidden_layers(learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=False)
+                    self.apply_gradient_accumulations_adam(learning_rate=lr, batch_size=batch_size, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, squared_gradient_term=squared_gradient_term)
 
                 # Update accuracy sum for this sample
                 local_accuracy_sum += 1.0 if self.last_outputs.index(max(self.last_outputs)) == expected_outputs.index(max(expected_outputs)) else 0.0
