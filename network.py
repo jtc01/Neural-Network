@@ -1,6 +1,8 @@
 import math
 import random
 from neuron import Neuron
+import neuron
+import neuron
 from testing import data
 
 
@@ -786,12 +788,10 @@ class NeuralNetwork:
                 neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * weight_gradient
 
                 # Update second moment (squared gradient)
-                neuron.squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (weight_gradient ** 2)
-
+                neuron.weight_squared_gradient_accumulation[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulation[weight_idx] + (1 - squared_gradient_term) * (weight_gradient ** 2)
                 # Compute bias-corrected moments
                 velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
-                squared_gradient_corrected = neuron.squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
-
+                squared_gradient_corrected = neuron.weight_squared_gradient_accumulation[weight_idx] / (1 - squared_gradient_term)
                 # Update weight using Adam update rule
                 neuron.weights[weight_idx] -= learning_rate * velocity_corrected / (math.sqrt(squared_gradient_corrected) + 1e-8)
             # Update bias in output layer
@@ -801,10 +801,10 @@ class NeuralNetwork:
             neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (bias_gradient ** 2)
             bias_velocity_corrected = neuron.bias_velocity / (1 - momentum)
             bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulation / (1 - squared_gradient_term)
-            neuron.bias -= learning_rate * bias_gradient / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
+            neuron.bias -= learning_rate * bias_velocity_corrected / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
 
         for layer in self.hidden_layers:
-            for neuron in layer:
+            for neuron in layer: 
                 for weight_idx in range(len(neuron.weights)):
                     input_value = neuron.last_inputs[weight_idx]
                     weight_gradient = neuron.node_value * input_value
@@ -814,11 +814,10 @@ class NeuralNetwork:
                     neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * weight_gradient
 
                     # Update second moment (squared gradient)
-                    neuron.squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (weight_gradient ** 2)
-
+                    neuron.weight_squared_gradient_accumulation[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulation[weight_idx] + (1 - squared_gradient_term) * (weight_gradient ** 2)
                     # Compute bias-corrected moments
                     velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
-                    squared_gradient_corrected = neuron.squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
+                    squared_gradient_corrected = neuron.weight_squared_gradient_accumulation[weight_idx] / (1 - squared_gradient_term)
 
                     # Update weight using Adam update rule
                     neuron.weights[weight_idx] -= learning_rate * velocity_corrected / (math.sqrt(squared_gradient_corrected) + 1e-8)
@@ -869,11 +868,11 @@ class NeuralNetwork:
                 neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * avg_weight_gradient
 
                 # Update second moment (squared gradient)
-                neuron.squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
+                neuron.weight_squared_gradient_accumulation[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulation[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
 
                 # Compute bias-corrected moments
                 velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
-                squared_gradient_corrected = neuron.squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
+                squared_gradient_corrected = neuron.weight_squared_gradient_accumulation[weight_idx] / (1 - squared_gradient_term)
 
                 # Update weight using Adam update rule
                 neuron.weights[weight_idx] -= learning_rate * velocity_corrected / (math.sqrt(squared_gradient_corrected) + 1e-8)
@@ -897,11 +896,11 @@ class NeuralNetwork:
                     neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * avg_weight_gradient
 
                     # Update second moment (squared gradient)
-                    neuron.squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
+                    neuron.weight_squared_gradient_accumulation[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulation[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
 
                     # Compute bias-corrected moments
                     velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
-                    squared_gradient_corrected = neuron.squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
+                    squared_gradient_corrected = neuron.weight_squared_gradient_accumulation[weight_idx] / (1 - squared_gradient_term)
 
                     # Update weight using Adam update rule
                     neuron.weights[weight_idx] -= learning_rate * velocity_corrected / (math.sqrt(squared_gradient_corrected) + 1e-8)
@@ -1052,7 +1051,7 @@ class NeuralNetwork:
                 self.accumulate_gradients()  # Accumulate gradients for this sample
                 if (idx + 1) % batch_size == 0:
                     self.apply_gradient_accumulations_adam(learning_rate=lr, batch_size=batch_size, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, squared_gradient_term=squared_gradient_term)
-
+                    self.reset_accumulated_gradients()  # Reset accumulated gradients after applying updates
                 # Update accuracy sum for this sample
                 local_accuracy_sum += 1.0 if self.last_outputs.index(max(self.last_outputs)) == expected_outputs.index(max(expected_outputs)) else 0.0
 
