@@ -37,6 +37,7 @@ def main():
 
         network.train_adam(train_data, epochs=1, initial_learning_rate=lr, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, squared_gradient_term=0.999, batch_size=32, dropout_rate=0.1)
         network.save(create_file_name(e))
+        e+=1
 
 
 def create_file_name(epoch):
