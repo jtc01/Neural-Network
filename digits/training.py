@@ -26,14 +26,18 @@ def main():
     t=0
     e=2
 
-    lr=0.0001
+    lr=0.001
 
     streak = 0
 
     correct = 0
     testing = False
 
-    network.train(train_data, epochs=1, initial_learning_rate=0.0005, learning_rate_decay=0.8, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9)
+    while True:
+
+        network.train_adam(train_data, epochs=1, initial_learning_rate=lr, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, squared_gradient_term=0.999, batch_size=32, dropout_rate=0.2)
+        network.save(create_file_name(e))
+
 
 def create_file_name(epoch):
     return f"network_state_epoch_{epoch}.json"

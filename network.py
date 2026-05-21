@@ -1025,7 +1025,7 @@ class NeuralNetwork:
             random.shuffle(data)  # Shuffle data each epoch for better training
 
             for idx, (inputs, expected_outputs) in enumerate(data):
-                self.forward(inputs)  # Forward pass to compute outputs and store intermediate values
+                self.forward(inputs, dropout_rate=dropout_rate)  # Forward pass to compute outputs and store intermediate values
                 self.compute_output_node_values(expected_outputs)  # Compute node values for output layer based on expected outputs
                 self.compute_hidden_node_values()  # Compute node values for hidden layers based on output layer
                 self.accumulate_gradients()  # Accumulate gradients for this sample
@@ -1059,7 +1059,7 @@ class NeuralNetwork:
                     print(f"Output Distribution: [{', '.join(f'{r:.4f}' for r in results)}]")
                     print(f"Label Distribution:  [{', '.join(f'{e:.4f}' for e in expected_outputs)}]")
 
-                    print(f"Local Accuracy (last {print_rate} samples): {local_accuracy_sum * 100 / print_rate:.4f}%")
+                    print(f"Local Accuracy (last {print_rate} samples): {local_accuracy_sum * 100 / print_rate:.1f}%")
                     print(f"Local Loss (last {print_rate} samples): {local_loss_sum / print_rate:.4f}")
                     print("-" * 30)
 
