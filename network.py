@@ -914,6 +914,27 @@ class NeuralNetwork:
                 bias_velocity_corrected = neuron.bias_velocity / (1 - momentum)
                 bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulation / (1 - squared_gradient_term)
                 neuron.bias -= learning_rate * bias_velocity_corrected / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
+    
+    def reset_accumulated_gradients(self):
+        """
+        Resets the accumulated gradients for all neurons in the network to zero.
+        This should be called after applying the accumulated gradients to update
+        weights and biases, and before starting to accumulate gradients for the
+        next mini-batch.
+
+        Args:
+            None (operates directly on neurons in the network)
+
+        Returns:
+            None (resets gradient accumulations in place)
+        """
+        for neuron in self.output_layer:
+            neuron.weight_gradient_accumulations = [0.0 for _ in neuron.weights]
+            neuron.bias_gradient_accumulation = 0.0
+        for layer in self.hidden_layers:
+            for neuron in layer:
+                neuron.weight_gradient_accumulations = [0.0 for _ in neuron.weights]
+                neuron.bias_gradient_accumulation = 0.0
 
     def train(self, data, epochs=1, initial_learning_rate=0.005, learning_rate_decay=1.0, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, batch_size=1, dropout_rate=0.0):
         """
@@ -1029,7 +1050,7 @@ class NeuralNetwork:
                 self.compute_output_node_values(expected_outputs)  # Compute node values for output layer based on expected outputs
                 self.compute_hidden_node_values()  # Compute node values for hidden layers based on output layer
                 self.accumulate_gradients()  # Accumulate gradients for this sample
-                if idx + 1 % batch_size == 0:
+                if (idx + 1) % batch_size == 0:
                     self.apply_gradient_accumulations_adam(learning_rate=lr, batch_size=batch_size, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, squared_gradient_term=squared_gradient_term)
 
                 # Update accuracy sum for this sample
