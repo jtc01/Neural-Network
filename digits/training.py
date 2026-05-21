@@ -20,13 +20,13 @@ def main():
         cost_function='cross-entropy'
     )
 
-    network.load("network_state_epoch_2.json")
+    network.load("network_state_epoch_3.json")
 
     k = 0
     t=0
-    e=2
+    e=4
 
-    lr=0.001
+    lr=0.005
 
     streak = 0
 
@@ -35,7 +35,7 @@ def main():
 
     while True:
 
-        network.train_adam(train_data, epochs=1, initial_learning_rate=lr, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, squared_gradient_term=0.999, batch_size=32, dropout_rate=0.2)
+        network.train_adam(train_data, epochs=1, initial_learning_rate=lr, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, squared_gradient_term=0.999, batch_size=32, dropout_rate=0.1)
         network.save(create_file_name(e))
 
 
