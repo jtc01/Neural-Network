@@ -20,7 +20,7 @@ def main():
         cost_function='cross-entropy'
     )
 
-    network.load("network_state_epoch_5.json")
+    network.load("starting_weights.json")
 
     k = 0
     t=0
