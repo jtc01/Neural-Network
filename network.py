@@ -993,7 +993,7 @@ class NeuralNetwork:
                     predicted_label = results.index(max(results))
                     expected_label = expected_outputs.index(max(expected_outputs))
                     accuracy = 1.0 if predicted_label == expected_label else 0.0
-                    print(f"Epoach {epoch+1}, Sample {idx+1}: Network Result: {predicted_label} | Sample Label: {expected_label}")
+                    print(f"Epoch {epoch+1}, Sample {idx+1}: Network Result: {predicted_label} | Sample Label: {expected_label}")
                     if self.cost_function == 'cross-entropy':
                         loss = -math.log(results[expected_label]) if results[expected_label] > 0 else float('inf')
                     elif self.cost_function == 'mse':
@@ -1067,7 +1067,7 @@ class NeuralNetwork:
                     predicted_label = results.index(max(results))
                     expected_label = expected_outputs.index(max(expected_outputs))
                     accuracy = 1.0 if predicted_label == expected_label else 0.0
-                    print(f"Epoach {epoch+1}, Sample {idx+1}: Network Result: {predicted_label} | Sample Label: {expected_label}")
+                    print(f"Epoch {epoch+1}, Sample {idx+1}: Network Result: {predicted_label} | Sample Label: {expected_label}")
                     if self.cost_function == 'cross-entropy':
                         loss = -math.log(results[expected_label]) if results[expected_label] > 0 else float('inf')
                     elif self.cost_function == 'mse':
