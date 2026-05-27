@@ -19,15 +19,13 @@ def main():
         cost_function='cross-entropy'
     )
 
-    network.load("network_state_epoch_3.json")
+    network.load("network_state_epoch_4.json")
 
     k = 0
     batch_correct = 0
     batch_loss = 0
     total_correct = 0
     total_loss = 0
-    random.seed(42)  # Set a fixed seed for reproducibility
-    random.shuffle(test_set)  # Shuffle the test set to ensure random order
 
     while True:
         
