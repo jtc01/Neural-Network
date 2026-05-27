@@ -1041,7 +1041,6 @@ class NeuralNetwork:
 
             lr = initial_learning_rate  # Adam uses adaptive learning rates, so we don't decay it here
 
-            random.seed(epoch)
             random.shuffle(data)  # Shuffle data each epoch for better training
 
             for idx, (inputs, expected_outputs) in enumerate(data):

@@ -1,3 +1,4 @@
+import random
 from network import NeuralNetwork
 from datasets import load_dataset
 import math
@@ -25,6 +26,8 @@ def main():
     batch_loss = 0
     total_correct = 0
     total_loss = 0
+    random.seed(42)  # Set a fixed seed for reproducibility
+    random.shuffle(test_set)  # Shuffle the test set to ensure random order
 
     while True:
         
