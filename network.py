@@ -1106,9 +1106,13 @@ class NeuralNetwork:
             layer_data = []
             for neuron in layer:
                 layer_data.append({
-                    "weights": neuron.weights,
-                    "bias": neuron.bias
-                })
+                "weights": neuron.weights,
+                "bias": neuron.bias,
+                "velocities": neuron.velocities,
+                "squared_gradient_accumulations": neuron.squared_gradient_accumulations,
+                "bias_velocity": neuron.bias_velocity,
+                "bias_squared_gradient_accumulation": neuron.bias_squared_gradient_accumulation
+            })
             data["hidden_layers"].append(layer_data)
 
         # Save output layer's weights and biases
@@ -1161,6 +1165,10 @@ class NeuralNetwork:
             for neuron_idx, neuron_data in enumerate(layer_data):
                 self.hidden_layers[layer_idx][neuron_idx].weights = neuron_data["weights"]
                 self.hidden_layers[layer_idx][neuron_idx].bias = neuron_data["bias"]
+                self.hidden_layers[layer_idx][neuron_idx].velocities = neuron_data["velocities"]
+                self.hidden_layers[layer_idx][neuron_idx].squared_gradient_accumulations = neuron_data["squared_gradient_accumulations"]
+                self.hidden_layers[layer_idx][neuron_idx].bias_velocity = neuron_data["bias_velocity"]
+                self.hidden_layers[layer_idx][neuron_idx].bias_squared_gradient_accumulation = neuron_data["bias_squared_gradient_accumulation"]
 
         # Load output layer weights and biases
         for neuron_idx, neuron_data in enumerate(data["output_layer"]):
