@@ -1109,7 +1109,7 @@ class NeuralNetwork:
                 "weights": neuron.weights,
                 "bias": neuron.bias,
                 "velocities": neuron.velocities,
-                "squared_gradient_accumulations": neuron.squared_gradient_accumulations,
+                "squared_gradient_accumulations": neuron.weight_squared_gradient_accumulation,
                 "bias_velocity": neuron.bias_velocity,
                 "bias_squared_gradient_accumulation": neuron.bias_squared_gradient_accumulation
             })
