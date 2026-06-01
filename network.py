@@ -788,17 +788,17 @@ class NeuralNetwork:
                 neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * weight_gradient
 
                 # Update second moment (squared gradient)
-                neuron.weight_squared_gradient_accumulation[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulation[weight_idx] + (1 - squared_gradient_term) * (weight_gradient ** 2)
+                neuron.weight_squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (weight_gradient ** 2)
                 # Compute bias-corrected moments
                 velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
-                squared_gradient_corrected = neuron.weight_squared_gradient_accumulation[weight_idx] / (1 - squared_gradient_term)
+                squared_gradient_corrected = neuron.weight_squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
                 # Update weight using Adam update rule
                 neuron.weights[weight_idx] -= learning_rate * velocity_corrected / (math.sqrt(squared_gradient_corrected) + 1e-8)
             # Update bias in output layer
             bias_gradient = neuron.node_value
             bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else bias_gradient  # Clip gradients if clip value is provided
             neuron.bias_velocity = momentum * neuron.bias_velocity + (1 - momentum) * bias_gradient
-            neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (bias_gradient ** 2)
+            neuron.bias_squared_gradient_accumulations = squared_gradient_term * neuron.bias_squared_gradient_accumulations + (1 - squared_gradient_term) * (bias_gradient ** 2)
             bias_velocity_corrected = neuron.bias_velocity / (1 - momentum)
             bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulation / (1 - squared_gradient_term)
             neuron.bias -= learning_rate * bias_velocity_corrected / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
@@ -814,10 +814,10 @@ class NeuralNetwork:
                     neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * weight_gradient
 
                     # Update second moment (squared gradient)
-                    neuron.weight_squared_gradient_accumulation[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulation[weight_idx] + (1 - squared_gradient_term) * (weight_gradient ** 2)
+                    neuron.weight_squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (weight_gradient ** 2)
                     # Compute bias-corrected moments
                     velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
-                    squared_gradient_corrected = neuron.weight_squared_gradient_accumulation[weight_idx] / (1 - squared_gradient_term)
+                    squared_gradient_corrected = neuron.weight_squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
 
                     # Update weight using Adam update rule
                     neuron.weights[weight_idx] -= learning_rate * velocity_corrected / (math.sqrt(squared_gradient_corrected) + 1e-8)
@@ -826,7 +826,7 @@ class NeuralNetwork:
                 bias_gradient = neuron.node_value
                 bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else bias_gradient  # Clip gradients if clip value is provided
                 neuron.bias_velocity = momentum * neuron.bias_velocity + (1 - momentum) * bias_gradient
-                neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (bias_gradient ** 2)
+                neuron.bias_squared_gradient_accumulations = squared_gradient_term * neuron.bias_squared_gradient_accumulations + (1 - squared_gradient_term) * (bias_gradient ** 2)
                 bias_velocity_corrected = neuron.bias_velocity / (1 - momentum)
                 bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulation / (1 - squared_gradient_term)
                 neuron.bias -= learning_rate * bias_velocity_corrected / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
@@ -868,11 +868,11 @@ class NeuralNetwork:
                 neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * avg_weight_gradient
 
                 # Update second moment (squared gradient)
-                neuron.weight_squared_gradient_accumulation[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulation[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
+                neuron.weight_squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
 
                 # Compute bias-corrected moments
                 velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
-                squared_gradient_corrected = neuron.weight_squared_gradient_accumulation[weight_idx] / (1 - squared_gradient_term)
+                squared_gradient_corrected = neuron.weight_squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
 
                 # Update weight using Adam update rule
                 neuron.weights[weight_idx] -= learning_rate * velocity_corrected / (math.sqrt(squared_gradient_corrected) + 1e-8)
@@ -881,9 +881,9 @@ class NeuralNetwork:
             avg_bias_gradient = neuron.bias_gradient_accumulation / batch_size
             avg_bias_gradient = max(min(avg_bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else avg_bias_gradient  # Clip gradients if clip value is provided
             neuron.bias_velocity = momentum * neuron.bias_velocity + (1 - momentum) * avg_bias_gradient
-            neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (avg_bias_gradient ** 2)
+            neuron.bias_squared_gradient_accumulations = squared_gradient_term * neuron.bias_squared_gradient_accumulations + (1 - squared_gradient_term) * (avg_bias_gradient ** 2)
             bias_velocity_corrected = neuron.bias_velocity / (1 - momentum)
-            bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulation / (1 - squared_gradient_term)
+            bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulations / (1 - squared_gradient_term)
             neuron.bias -= learning_rate * bias_velocity_corrected / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
 
         for layer in self.hidden_layers:
@@ -896,11 +896,11 @@ class NeuralNetwork:
                     neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * avg_weight_gradient
 
                     # Update second moment (squared gradient)
-                    neuron.weight_squared_gradient_accumulation[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulation[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
+                    neuron.weight_squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
 
                     # Compute bias-corrected moments
                     velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
-                    squared_gradient_corrected = neuron.weight_squared_gradient_accumulation[weight_idx] / (1 - squared_gradient_term)
+                    squared_gradient_corrected = neuron.weight_squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
 
                     # Update weight using Adam update rule
                     neuron.weights[weight_idx] -= learning_rate * velocity_corrected / (math.sqrt(squared_gradient_corrected) + 1e-8)
@@ -1109,7 +1109,7 @@ class NeuralNetwork:
                 "weights": neuron.weights,
                 "bias": neuron.bias,
                 "velocities": neuron.velocities,
-                "squared_gradient_accumulations": neuron.weight_squared_gradient_accumulation,
+                "squared_gradient_accumulations": neuron.weight_squared_gradient_accumulations,
                 "bias_velocity": neuron.bias_velocity,
                 "bias_squared_gradient_accumulation": neuron.bias_squared_gradient_accumulation
             })
@@ -1119,7 +1119,11 @@ class NeuralNetwork:
         for neuron in self.output_layer:
             data["output_layer"].append({
                 "weights": neuron.weights,
-                "bias": neuron.bias
+                "bias": neuron.bias,
+                "velocities": neuron.velocities,
+                "squared_gradient_accumulations": neuron.weight_squared_gradient_accumulations,
+                "bias_velocity": neuron.bias_velocity,
+                "bias_squared_gradient_accumulation": neuron.bias_squared_gradient_accumulation
             })
 
         with open(filename, "w") as f:
@@ -1166,7 +1170,7 @@ class NeuralNetwork:
                 self.hidden_layers[layer_idx][neuron_idx].weights = neuron_data["weights"]
                 self.hidden_layers[layer_idx][neuron_idx].bias = neuron_data["bias"]
                 self.hidden_layers[layer_idx][neuron_idx].velocities = neuron_data["velocities"]
-                self.hidden_layers[layer_idx][neuron_idx].squared_gradient_accumulations = neuron_data["squared_gradient_accumulations"]
+                self.hidden_layers[layer_idx][neuron_idx].weight_squared_gradient_accumulations = neuron_data["squared_gradient_accumulations"]
                 self.hidden_layers[layer_idx][neuron_idx].bias_velocity = neuron_data["bias_velocity"]
                 self.hidden_layers[layer_idx][neuron_idx].bias_squared_gradient_accumulation = neuron_data["bias_squared_gradient_accumulation"]
 
@@ -1174,6 +1178,12 @@ class NeuralNetwork:
         for neuron_idx, neuron_data in enumerate(data["output_layer"]):
             self.output_layer[neuron_idx].weights = neuron_data["weights"]
             self.output_layer[neuron_idx].bias = neuron_data["bias"]
+            self.output_layer[neuron_idx].velocities = neuron_data["velocities"]
+            self.output_layer[neuron_idx].weight_squared_gradient_accumulations = neuron_data["squared_gradient_accumulations"]
+            self.output_layer[neuron_idx].bias_velocity = neuron_data["bias_velocity"]
+            self.output_layer[neuron_idx].bias_squared_gradient_accumulation = neuron_data["bias_squared_gradient_accumulation"]
+
+
 
         print(f"Network loaded from {filename}")
         
