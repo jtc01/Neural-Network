@@ -798,7 +798,7 @@ class NeuralNetwork:
             bias_gradient = neuron.node_value
             bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else bias_gradient  # Clip gradients if clip value is provided
             neuron.bias_velocity = momentum * neuron.bias_velocity + (1 - momentum) * bias_gradient
-            neuron.bias_squared_gradient_accumulations = squared_gradient_term * neuron.bias_squared_gradient_accumulations + (1 - squared_gradient_term) * (bias_gradient ** 2)
+            neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (bias_gradient ** 2)
             bias_velocity_corrected = neuron.bias_velocity / (1 - momentum)
             bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulation / (1 - squared_gradient_term)
             neuron.bias -= learning_rate * bias_velocity_corrected / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
@@ -826,7 +826,7 @@ class NeuralNetwork:
                 bias_gradient = neuron.node_value
                 bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else bias_gradient  # Clip gradients if clip value is provided
                 neuron.bias_velocity = momentum * neuron.bias_velocity + (1 - momentum) * bias_gradient
-                neuron.bias_squared_gradient_accumulations = squared_gradient_term * neuron.bias_squared_gradient_accumulations + (1 - squared_gradient_term) * (bias_gradient ** 2)
+                neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (bias_gradient ** 2)
                 bias_velocity_corrected = neuron.bias_velocity / (1 - momentum)
                 bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulation / (1 - squared_gradient_term)
                 neuron.bias -= learning_rate * bias_velocity_corrected / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
@@ -881,9 +881,9 @@ class NeuralNetwork:
             avg_bias_gradient = neuron.bias_gradient_accumulation / batch_size
             avg_bias_gradient = max(min(avg_bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else avg_bias_gradient  # Clip gradients if clip value is provided
             neuron.bias_velocity = momentum * neuron.bias_velocity + (1 - momentum) * avg_bias_gradient
-            neuron.bias_squared_gradient_accumulations = squared_gradient_term * neuron.bias_squared_gradient_accumulations + (1 - squared_gradient_term) * (avg_bias_gradient ** 2)
+            neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (avg_bias_gradient ** 2)
             bias_velocity_corrected = neuron.bias_velocity / (1 - momentum)
-            bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulations / (1 - squared_gradient_term)
+            bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulation / (1 - squared_gradient_term)
             neuron.bias -= learning_rate * bias_velocity_corrected / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
 
         for layer in self.hidden_layers:
@@ -1154,6 +1154,13 @@ class NeuralNetwork:
                 if len(neuron_data["weights"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
                     print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} weights for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['weights'])}")# Thats one long line of code
                     return
+                if len(neuron_data["velocities"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
+                    print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} velocities for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['velocities'])}")
+                    return
+                if len(neuron_data["squared_gradient_accumulations"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
+                    print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} squared gradient accumulations for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['squared_gradient_accumulations'])}")
+                    return
+                
         
         if len(data["output_layer"]) != len(self.output_layer):
             print(f"Failed to load network: expected {len(self.output_layer)} neurons in output layer, but file has {len(data['output_layer'])}")
@@ -1163,6 +1170,13 @@ class NeuralNetwork:
             if len(neuron_data["weights"]) != len(self.output_layer[neuron_idx].weights):
                 print(f"Failed to load network: expected {len(self.output_layer[neuron_idx].weights)} weights for output neuron {neuron_idx+1}, but file has {len(neuron_data['weights'])}")
                 return
+            if len(neuron_data["velocities"]) != len(self.output_layer[neuron_idx].weights):
+                print(f"Failed to load network: expected {len(self.output_layer[neuron_idx].weights)} velocities for output neuron {neuron_idx+1}, but file has {len(neuron_data['velocities'])}")
+                return
+            if len(neuron_data["squared_gradient_accumulations"]) != len(self.output_layer[neuron_idx].weights):
+                print(f"Failed to load network: expected {len(self.output_layer[neuron_idx].weights)} squared gradient accumulations for output neuron {neuron_idx+1}, but file has {len(neuron_data['squared_gradient_accumulations'])}")
+                return
+            
 
         # Load hidden layer weights and biases
         for layer_idx, layer_data in enumerate(data["hidden_layers"]):
