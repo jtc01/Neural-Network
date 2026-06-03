@@ -19,7 +19,7 @@ def main():
         cost_function='cross-entropy'
     )
 
-    network.load("network_state_epoch_9.json")
+    network.load("network_state_epoch_13.json")
 
     k = 0
     batch_correct = 0
