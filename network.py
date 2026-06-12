@@ -1,9 +1,6 @@
 import math
 import random
 from neuron import Neuron
-import neuron
-import neuron
-from testing import data
 
 
 
