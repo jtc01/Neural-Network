@@ -1,3 +1,4 @@
+import random
 from network import NeuralNetwork
 from datasets import load_dataset
 import math
@@ -18,16 +19,20 @@ def main():
         cost_function='cross-entropy'
     )
 
-    network.load("network_state_epoch_2.json")
+    network.load("network_state_epoch_13.json")
 
     k = 0
-    correct = 0
+    batch_correct = 0
+    batch_loss = 0
+    total_correct = 0
     total_loss = 0
 
     while True:
+        
+
         inputs = []
         
-        numeral = train_set[k]
+        numeral = test_set[k]
         label = numeral["label"]
 
         image = numeral["image"]
@@ -43,20 +48,22 @@ def main():
         output = network.forward(inputs)
         result = output.index(max(output))
         if index == result:
-            correct += 1
+            batch_correct += 1
+            total_correct += 1
 
-        total_loss += cross_entropy_loss(output, index)
-
+        loss = cross_entropy_loss(output, index)
+        batch_loss += loss
+        total_loss += loss
 
         if k % 100 == 0:
             print(f"{k} | {label} | {result}")
 
         if k % 1000 == 0:
             if k > 0:
-                print(f"Accuracy from sample {k-1000} to {k}: {correct/1000:.2%}")
-                print(f"Average Cross-Entropy Loss from sample {k-1000} to {k}: {total_loss/1000:.4f}")
-            correct = 0
-            total_loss = 0
+                print(f"Accuracy from sample {k-1000} to {k}: {batch_correct/1000:.2%}")
+                print(f"Average Cross-Entropy Loss from sample {k-1000} to {k}: {batch_loss/1000:.4f}")
+            batch_correct = 0
+            batch_loss = 0
             print(f"Test {k}: Label={label}, Predicted={result}")
             for i in range(10):
                 if (int(label) == i):
@@ -67,8 +74,10 @@ def main():
             print(f"  Loss: {loss:.4f}\n")
         k+=1
             
-        if k >= len(train_set):
+        if k >= len(test_set):
             print("Testing completed.")
+            print(f"Total Accuracy: {total_correct/len(test_set):.2%}")
+            print(f"Average Cross-Entropy Loss: {total_loss/len(test_set):.4f}")
             break
 
 def cross_entropy_loss(softmax_outputs, true_label):

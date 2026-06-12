@@ -1,0 +1,7 @@
+Epoch 1
+Accuracy: 90.35%
+Loss: 1.7264
+
+Epoch 2
+Total Accuracy: 91.63%
+Average Cross-Entropy Loss: 1.7066

@@ -20,11 +20,11 @@ def main():
         cost_function='cross-entropy'
     )
 
-    network.load("network_state_epoch_2.json")
+    network.load("network_state_epoch_10.json")
 
     k = 0
     t=0
-    e=2
+    e=10
 
     lr=0.0001
 
@@ -33,7 +33,13 @@ def main():
     correct = 0
     testing = False
 
-    network.train(train_data, epochs=1, initial_learning_rate=0.0005, learning_rate_decay=0.8, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9)
+    while True:
+        random.seed(e)
+        random.shuffle(train_data)  # Shuffle the training data at the start of each epoch
+        network.train(train_data, epochs=1, optimizer='adam', initial_learning_rate=lr, learning_rate_decay=1.0, batch_size=32, dropout_rate=0.05, weight_clip_value=10.0, bias_clip_value=20.0, momentum=0.9, squared_gradient_term=0.999, print_rate=1000)
+        network.save(create_file_name(e))
+        e+=1
+
 
 def create_file_name(epoch):
     return f"network_state_epoch_{epoch}.json"
