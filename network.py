@@ -935,155 +935,121 @@ class NeuralNetwork:
                 neuron.weight_gradient_accumulations = [0.0 for _ in neuron.weights]
                 neuron.bias_gradient_accumulation = 0.0
 
-    def train(self, data, epochs=1, initial_learning_rate=0.005, learning_rate_decay=1.0, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, batch_size=1, dropout_rate=0.0):
+    def train(self, data, epochs=1, optimizer='adam', initial_learning_rate=0.001,
+          learning_rate_decay=1.0, batch_size=32, dropout_rate=0.0,
+          weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9,
+          squared_gradient_term=0.999, print_rate=1000):
         """
-        Trains the network for a specified number of epochs on the given training data.
+        Train the network on the given data using the specified optimizer.
+
+        This is the main training entry point. It handles shuffling, batching,
+        gradient accumulation, weight updates, and progress printing for each
+        epoch. Both SGD and Adam use the same training loop structure, differing
+        only in how weights are updated.
 
         Args:
-            data (List): List of training samples, where each sample is a tuple (inputs, expected_outputs)
-            Each 'inputs' is a 1D list of input values in some normalized order, and each 'expected_outputs' is a list of expected output values.
-
-            epochs (int): Number of times to iterate through the entire training dataset
-            initial_learning_rate (float): The starting learning rate for weight updates
-            learning_rate_decay (float): Factor by which to decay the learning rate after each epoch (e.g., 0.95 for 5% decay per epoch)
-            print_rate (int): How often to print the results of a single training sample (accuracy, loss, distribution, etc.)
-            weight_clip_value (float): Maximum absolute value for weight gradients to prevent extreme updates
-            bias_clip_value (float): Maximum absolute value for bias gradients to prevent extreme updates
-            momentum (float): Momentum factor for weight and bias updates (0.0 means no momentum, 0.9 is common)
+            data (list):                  List of (inputs, expected_outputs) tuples.
+            epochs (int):                 Number of full passes through the dataset.
+                                        Default: 1.
+            optimizer (str):              Which optimizer to use. Options are 'sgd'
+                                        and 'adam'. Default: 'adam'.
+            initial_learning_rate (float):Starting learning rate. Decayed each epoch
+                                        by learning_rate_decay. Default: 0.001.
+            learning_rate_decay (float):  Multiplicative decay factor applied to the
+                                        learning rate after each epoch. 1.0 means
+                                        no decay, 0.95 means 5% decay per epoch.
+                                        Default: 1.0.
+            batch_size (int):             Number of samples to accumulate gradients
+                                        over before applying a weight update.
+                                        Default: 32.
+            dropout_rate (float):         Fraction of hidden neurons to randomly
+                                        disable during each forward pass. 0.0
+                                        disables dropout. Default: 0.0.
+            weight_clip_value (float):    Gradients for weights are clamped to
+                                        [-weight_clip_value, weight_clip_value]
+                                        before being applied. Default: 5.0.
+            bias_clip_value (float):      Gradients for biases are clamped to
+                                        [-bias_clip_value, bias_clip_value]
+                                        before being applied. Default: 10.0.
+            momentum (float):             Momentum term for both SGD and Adam.
+                                        For SGD this controls the velocity decay.
+                                        For Adam this is the β1 parameter.
+                                        Default: 0.9.
+            squared_gradient_term (float):Adam only. Controls the decay rate of the
+                                        second moment estimate. This is the β2
+                                        parameter. Ignored when optimizer is 'sgd'.
+                                        Default: 0.999.
+            print_rate (int):             How often to print training progress, in
+                                        number of samples. Default: 1000.
 
         Returns:
-            None (the network's weights and biases are updated in place)
+            None: Weights and biases are updated in place.
+
+        Raises:
+            ValueError: If optimizer is not 'sgd' or 'adam'.
         """
+        if optimizer not in ('sgd', 'adam'):
+            raise ValueError(f"Unknown optimizer '{optimizer}'. Choose 'sgd' or 'adam'.")
 
         for epoch in range(epochs):
-            
-            total_accuracy = 0.0
-            total_loss = 0.0
-
+            lr = initial_learning_rate * (learning_rate_decay ** epoch)
             local_accuracy_sum = 0.0
             local_loss_sum = 0.0
 
-            lr = initial_learning_rate * (learning_rate_decay ** epoch)  # Decay learning rate each epoch
-            
-            random.seed(epoch)
-            random.shuffle(data)  # Shuffle data each epoch for better training
+            random.shuffle(data)
+            self.reset_accumulated_gradients()
 
             for idx, (inputs, expected_outputs) in enumerate(data):
-                self.forward(inputs)  # Forward pass to compute outputs and store intermediate values
-                if idx + 1 % batch_size == 0:
-                    self.backpropagate_output_layer(expected_outputs, learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=True)
-                    self.backpropagate_hidden_layers(learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=True)
-                else:
-                    self.backpropagate_output_layer(expected_outputs, learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=False)
-                    self.backpropagate_hidden_layers(learning_rate=lr, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, update_weights=False)
+                # Forward pass
+                self.forward(inputs, dropout_rate=dropout_rate)
 
-                # Update accuracy sum for this sample
-                local_accuracy_sum += 1.0 if self.last_outputs.index(max(self.last_outputs)) == expected_outputs.index(max(expected_outputs)) else 0.0
+                # Compute gradients
+                self.compute_output_node_values(expected_outputs)
+                self.compute_hidden_node_values()
+                self.accumulate_gradients()
 
-                # Update loss for calculation and printing
-                if self.cost_function == 'cross-entropy':
-                    local_loss_sum += -math.log(self.last_outputs[expected_outputs.index(max(expected_outputs))]) if self.last_outputs[expected_outputs.index(max(expected_outputs))] > 0 else float('inf')
-                elif self.cost_function == 'mse':
-                    local_loss_sum += 0.5 * sum((r - e) ** 2 for r, e in zip(self.last_outputs, expected_outputs))
-                else:
-                    local_loss_sum += 0.5 * sum((r - e) ** 2 for r, e in zip(self.last_outputs, expected_outputs))  # Default to MSE
-
-                if (idx + 1) % print_rate == 0:
-                    results = self.last_outputs
-                    predicted_label = results.index(max(results))
-                    expected_label = expected_outputs.index(max(expected_outputs))
-                    accuracy = 1.0 if predicted_label == expected_label else 0.0
-                    print(f"Epoch {epoch+1}, Sample {idx+1}: Network Result: {predicted_label} | Sample Label: {expected_label}")
-                    if self.cost_function == 'cross-entropy':
-                        loss = -math.log(results[expected_label]) if results[expected_label] > 0 else float('inf')
-                    elif self.cost_function == 'mse':
-                        loss = 0.5 * sum((r - e) ** 2 for r, e in zip(results, expected_outputs))
-                    else:
-                        loss = 0.5 * sum((r - e) ** 2 for r, e in zip(results, expected_outputs))  # Default to MSE
-                    print(f"Loss: {loss:.4f}")
-                    print(f"Output Distribution: [{', '.join(f'{r:.4f}' for r in results)}]")
-                    print(f"Label Distribution:  [{', '.join(f'{e:.4f}' for e in expected_outputs)}]")
-
-                    print(f"Local Accuracy (last {print_rate} samples): {local_accuracy_sum * 100 / print_rate:.4f}%")
-                    print(f"Local Loss (last {print_rate} samples): {local_loss_sum / print_rate:.4f}")
-                    print("-" * 30)
-
-                    local_accuracy_sum = 0.0
-                    local_loss_sum = 0.0
-    
-    def train_adam(self, data, epochs=1, initial_learning_rate=0.005, print_rate=1000, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, squared_gradient_term=0.999, batch_size=1, dropout_rate=0.0):
-        """
-        Trains the network for a specified number of epochs on the given training data.
-
-        Args:
-            data (List): List of training samples, where each sample is a tuple (inputs, expected_outputs)
-            Each 'inputs' is a 1D list of input values in some normalized order, and each 'expected_outputs' is a list of expected output values.
-
-            epochs (int): Number of times to iterate through the entire training dataset
-            initial_learning_rate (float): The starting learning rate for weight updates
-            learning_rate_decay (float): Factor by which to decay the learning rate after each epoch (e.g., 0.95 for 5% decay per epoch)
-            print_rate (int): How often to print the results of a single training sample (accuracy, loss, distribution, etc.)
-            weight_clip_value (float): Maximum absolute value for weight gradients to prevent extreme updates
-            bias_clip_value (float): Maximum absolute value for bias gradients to prevent extreme updates
-            momentum (float): Momentum factor for weight and bias updates (0.0 means no momentum, 0.9 is common)
-
-        Returns:
-            None (the network's weights and biases are updated in place)
-        """
-
-        for epoch in range(epochs):
-            
-            total_accuracy = 0.0
-            total_loss = 0.0
-
-            local_accuracy_sum = 0.0
-            local_loss_sum = 0.0
-
-            lr = initial_learning_rate  # Adam uses adaptive learning rates, so we don't decay it here
-
-            random.shuffle(data)  # Shuffle data each epoch for better training
-
-            for idx, (inputs, expected_outputs) in enumerate(data):
-                self.forward(inputs, dropout_rate=dropout_rate)  # Forward pass to compute outputs and store intermediate values
-                self.compute_output_node_values(expected_outputs)  # Compute node values for output layer based on expected outputs
-                self.compute_hidden_node_values()  # Compute node values for hidden layers based on output layer
-                self.accumulate_gradients()  # Accumulate gradients for this sample
+                # Apply weight update at end of each batch
                 if (idx + 1) % batch_size == 0:
-                    self.apply_gradient_accumulations_adam(learning_rate=lr, batch_size=batch_size, weight_clip_value=weight_clip_value, bias_clip_value=bias_clip_value, momentum=momentum, squared_gradient_term=squared_gradient_term)
-                    self.reset_accumulated_gradients()  # Reset accumulated gradients after applying updates
-                # Update accuracy sum for this sample
-                local_accuracy_sum += 1.0 if self.last_outputs.index(max(self.last_outputs)) == expected_outputs.index(max(expected_outputs)) else 0.0
+                    if optimizer == 'adam':
+                        self.apply_gradient_accumulations_adam(
+                            learning_rate=lr,
+                            batch_size=batch_size,
+                            weight_clip_value=weight_clip_value,
+                            bias_clip_value=bias_clip_value,
+                            momentum=momentum,
+                            squared_gradient_term=squared_gradient_term
+                        )
+                    elif optimizer == 'sgd':
+                        self.apply_gradient_accumulations_sgd(
+                            learning_rate=lr,
+                            batch_size=batch_size,
+                            weight_clip_value=weight_clip_value,
+                            bias_clip_value=bias_clip_value,
+                            momentum=momentum
+                        )
+                    self.reset_accumulated_gradients()
 
-                # Update loss for calculation and printing
+                # Track accuracy and loss
+                predicted_label = self.last_outputs.index(max(self.last_outputs))
+                expected_label = expected_outputs.index(max(expected_outputs))
+                local_accuracy_sum += 1.0 if predicted_label == expected_label else 0.0
+
                 if self.cost_function == 'cross-entropy':
-                    local_loss_sum += -math.log(self.last_outputs[expected_outputs.index(max(expected_outputs))]) if self.last_outputs[expected_outputs.index(max(expected_outputs))] > 0 else float('inf')
-                elif self.cost_function == 'mse':
-                    local_loss_sum += 0.5 * sum((r - e) ** 2 for r, e in zip(self.last_outputs, expected_outputs))
+                    p = self.last_outputs[expected_label]
+                    local_loss_sum += -math.log(p) if p > 0 else float('inf')
                 else:
-                    local_loss_sum += 0.5 * sum((r - e) ** 2 for r, e in zip(self.last_outputs, expected_outputs))  # Default to MSE
+                    local_loss_sum += 0.5 * sum((r - e) ** 2 for r, e in zip(self.last_outputs, expected_outputs))
 
-                if (idx + 1) % print_rate == 0:
-                    results = self.last_outputs
-                    predicted_label = results.index(max(results))
-                    expected_label = expected_outputs.index(max(expected_outputs))
-                    accuracy = 1.0 if predicted_label == expected_label else 0.0
-                    print(f"Epoch {epoch+1}, Sample {idx+1}: Network Result: {predicted_label} | Sample Label: {expected_label}")
-                    if self.cost_function == 'cross-entropy':
-                        loss = -math.log(results[expected_label]) if results[expected_label] > 0 else float('inf')
-                    elif self.cost_function == 'mse':
-                        loss = 0.5 * sum((r - e) ** 2 for r, e in zip(results, expected_outputs))
-                    else:
-                        loss = 0.5 * sum((r - e) ** 2 for r, e in zip(results, expected_outputs))  # Default to MSE
-                    print(f"Loss: {loss:.4f}")
-                    print(f"Output Distribution: [{', '.join(f'{r:.4f}' for r in results)}]")
-                    print(f"Label Distribution:  [{', '.join(f'{e:.4f}' for e in expected_outputs)}]")
-
-                    print(f"Local Accuracy (last {print_rate} samples): {local_accuracy_sum * 100 / print_rate:.1f}%")
-                    print(f"Local Loss (last {print_rate} samples): {local_loss_sum / print_rate:.4f}")
-                    print("-" * 30)
-
-                    local_accuracy_sum = 0.0
-                    local_loss_sum = 0.0
+                # Print progress
+                if print_rate != 0:
+                    if (idx + 1) % print_rate == 0:
+                        print(f"Epoch {epoch+1}, Sample {idx+1}: {predicted_label} | {expected_label}")
+                        print(f"Local Accuracy (last {print_rate}): {local_accuracy_sum * 100 / print_rate:.1f}%")
+                        print(f"Local Loss (last {print_rate}): {local_loss_sum / print_rate:.4f}")
+                        print(f"Learning Rate: {lr:.6f}")
+                        print("-" * 30)
+                        local_accuracy_sum = 0.0
+                        local_loss_sum = 0.0
 
 
 

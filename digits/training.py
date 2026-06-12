@@ -36,7 +36,7 @@ def main():
     while True:
         random.seed(e)
         random.shuffle(train_data)  # Shuffle the training data at the start of each epoch
-        network.train_adam(train_data, epochs=1, initial_learning_rate=lr, print_rate=1000, weight_clip_value=10.0, bias_clip_value=20.0, momentum=0.9, squared_gradient_term=0.999, batch_size=32, dropout_rate=0.1)
+        network.train(train_data, epochs=1, optimizer='adam', initial_learning_rate=lr, learning_rate_decay=1.0, batch_size=32, dropout_rate=0.05, weight_clip_value=10.0, bias_clip_value=20.0, momentum=0.9, squared_gradient_term=0.999, print_rate=1000)
         network.save(create_file_name(e))
         e+=1
 
