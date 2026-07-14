@@ -1020,6 +1020,64 @@ class NeuralNetwork:
                 neuron.bias_squared_gradient_accumulation += avg_bias_gradient ** 2
                 neuron.bias -= learning_rate / (math.sqrt(neuron.bias_squared_gradient_accumulation) + 1e-8) * avg_bias_gradient
 
+    def apply_gradient_accumulations_RMSprop(self, learning_rate=0.001, batch_size=1, weight_clip_value=5.0, bias_clip_value=10.0, squared_gradient_term=0.999):
+        """
+        Updates the weights and biases of all neurons in the network using the
+        average of the gradients accumulated over a mini-batch, via the RMSprop
+        optimization algorithm. RMSprop divides the learning rate by a running
+        average of the magnitude of recent gradients for each parameter, which
+        helps stabilize updates when gradients vary widely in scale.
+
+        This function should be called after accumulate_gradients() has been
+        called once for each sample in the mini-batch. After calling this
+        function, reset_accumulated_gradients() should be called before
+        processing the next mini-batch.
+
+        Args:
+            learning_rate (float): The base learning rate. Default: 0.001.
+            batch_size (int): The number of samples in the mini-batch. Used to
+                average the accumulated gradients before applying the update.
+            weight_clip_value (float or None): If provided, weight gradients are
+                clamped to [-weight_clip_value, weight_clip_value]. If None, no
+                clipping is applied.
+            bias_clip_value (float or None): If provided, bias gradients are
+                clamped to [-bias_clip_value, bias_clip_value]. If None, no
+                clipping is applied.
+            squared_gradient_term (float): Controls the decay rate of the running
+                average of squared gradients. Default: 0.999.
+
+        Returns:
+            None: Weights and biases are updated directly inside each neuron.
+                Accumulated gradients are not reset by this function and must
+                be reset manually by calling reset_accumulated_gradients().
+        """
+        for neuron in self.output_layer:
+            for weight_idx in range(len(neuron.weights)):
+                avg_weight_gradient = neuron.weight_gradient_accumulations[weight_idx] / batch_size
+                avg_weight_gradient = max(min(avg_weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else avg_weight_gradient
+
+                neuron.weight_squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
+                neuron.weights[weight_idx] -= learning_rate * avg_weight_gradient / (math.sqrt(neuron.weight_squared_gradient_accumulations[weight_idx]) + 1e-8)
+
+            avg_bias_gradient = neuron.bias_gradient_accumulation / batch_size
+            avg_bias_gradient = max(min(avg_bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else avg_bias_gradient
+            neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (avg_bias_gradient ** 2)
+            neuron.bias -= learning_rate * avg_bias_gradient / (math.sqrt(neuron.bias_squared_gradient_accumulation) + 1e-8)
+
+        for layer in self.hidden_layers:
+            for neuron in layer:
+                for weight_idx in range(len(neuron.weights)):
+                    avg_weight_gradient = neuron.weight_gradient_accumulations[weight_idx] / batch_size
+                    avg_weight_gradient = max(min(avg_weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else avg_weight_gradient
+
+                    neuron.weight_squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
+                    neuron.weights[weight_idx] -= learning_rate * avg_weight_gradient / (math.sqrt(neuron.weight_squared_gradient_accumulations[weight_idx]) + 1e-8)
+
+                avg_bias_gradient = neuron.bias_gradient_accumulation / batch_size
+                avg_bias_gradient = max(min(avg_bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else avg_bias_gradient
+                neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (avg_bias_gradient ** 2)
+                neuron.bias -= learning_rate * avg_bias_gradient / (math.sqrt(neuron.bias_squared_gradient_accumulation) + 1e-8)
+
     def reset_accumulated_gradients(self):
         """
         Resets the accumulated gradients for all neurons in the network to zero.
@@ -1058,7 +1116,7 @@ class NeuralNetwork:
             epochs (int):                 Number of full passes through the dataset.
                                         Default: 1.
             optimizer (str):              Which optimizer to use. Options are 'sgd',
-                                        'adam', and 'adagrad'. Default: 'adam'.
+                                        'adam', 'adagrad', and 'rmsprop'. Default: 'adam'.
             initial_learning_rate (float):Starting learning rate. Decayed each epoch
                                         by learning_rate_decay. Default: 0.001.
             learning_rate_decay (float):  Multiplicative decay factor applied to the
@@ -1081,10 +1139,10 @@ class NeuralNetwork:
                                         For SGD this controls the velocity decay.
                                         For Adam this is the β1 parameter.
                                         Default: 0.9.
-            squared_gradient_term (float):Adam only. Controls the decay rate of the
-                                        second moment estimate. This is the β2
-                                        parameter. Ignored when optimizer is not
-                                        'adam'. Default: 0.999.
+            squared_gradient_term (float):Adam and RMSprop only. Controls the decay
+                                        rate of the second moment / squared gradient
+                                        estimate (Adam's β2 parameter). Ignored when
+                                        optimizer is 'sgd' or 'adagrad'. Default: 0.999.
             print_rate (int):             How often to print training progress, in
                                         number of samples. Default: 1000.
 
@@ -1094,8 +1152,8 @@ class NeuralNetwork:
         Raises:
             ValueError: If optimizer is not 'sgd' or 'adam'.
         """
-        if optimizer not in ('sgd', 'adam', 'adagrad'):
-            raise ValueError(f"Unknown optimizer '{optimizer}'. Choose 'sgd', 'adam', or 'adagrad'.")
+        if optimizer not in ('sgd', 'adam', 'adagrad', 'rmsprop'):
+            raise ValueError(f"Unknown optimizer '{optimizer}'. Choose 'sgd', 'adam', 'adagrad', or 'rmsprop'.")
 
         for epoch in range(epochs):
             lr = initial_learning_rate * (learning_rate_decay ** epoch)
@@ -1139,6 +1197,14 @@ class NeuralNetwork:
                             batch_size=batch_size,
                             weight_clip_value=weight_clip_value,
                             bias_clip_value=bias_clip_value
+                        )
+                    elif optimizer == 'rmsprop':
+                        self.apply_gradient_accumulations_RMSprop(
+                            learning_rate=lr,
+                            batch_size=batch_size,
+                            weight_clip_value=weight_clip_value,
+                            bias_clip_value=bias_clip_value,
+                            squared_gradient_term=squared_gradient_term
                         )
                     self.reset_accumulated_gradients()
 

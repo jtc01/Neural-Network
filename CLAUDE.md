@@ -8,17 +8,20 @@ A feedforward neural network implemented from scratch in Python, with no ML fram
 
 ## Running things
 
+All entry-point scripts import `network` and `neuron` with bare imports (`from network import NeuralNetwork`), which only resolves when the repo root is on `sys.path`. Run them as modules from the repo root, not as bare file paths — `python digits/main.py` fails with `ModuleNotFoundError: No module named 'network'` because Python puts the script's own directory (`digits/`), not the repo root, on `sys.path`.
+
 ```bash
 # MNIST training (current approach — uses train() method with Adam + mini-batches)
-python digits/training.py
+python -m digits.training
 
 # MNIST training (older approach — manual per-sample loop)
-python digits/main.py
+python -m digits.main
 
 # Simple 2-input classifier test
-python testing/main.py
+python -m testing.main
 
-# Flask REST API (runs on http://127.0.0.1:5000)
+# Flask REST API (runs on http://127.0.0.1:5000) — this one has a hardcoded
+# sys.path.append and can be run directly
 python app/app.py
 ```
 
@@ -54,11 +57,11 @@ network.compute_output_node_values(expected_outputs)
 network.compute_hidden_node_values()
 network.accumulate_gradients()
 # Once per batch:
-network.apply_gradient_accumulations_adam(learning_rate, batch_size, ...)
+network.apply_gradient_accumulations_adam(learning_rate, batch_size, ...)  # or _sgd / _adagrad
 network.reset_accumulated_gradients()
 ```
 
-The `train()` method wraps the mini-batch API and is the preferred entry point for new training code.
+The `train()` method wraps the mini-batch API and is the preferred entry point for new training code. It takes `optimizer='sgd'|'adam'|'adagrad'` (default `'adam'`) and dispatches to the matching `apply_gradient_accumulations_*` method each batch.
 
 ### Saving / loading
 
