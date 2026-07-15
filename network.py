@@ -265,12 +265,15 @@ class NeuralNetwork:
         
         # Calculate node value for each output neuron
         for neuron_idx, neuron in enumerate(self.output_layer):
-            # Get the predicted output (activation) for this neuron
-            predicted_output = neuron.last_output
-            
+            # Get the predicted output (activation) for this neuron. When softmax
+            # is in use, neuron.last_output is the raw pre-softmax linear score,
+            # so the actual predicted probability must come from the network's
+            # post-softmax outputs instead.
+            predicted_output = self.last_outputs[neuron_idx] if self.using_softmax else neuron.last_output
+
             # Get the expected output for this neuron
             expected_output = expected_outputs[neuron_idx]
-            
+
             if self.cost_function == 'cross-entropy':
                 # Calculate ∂Cost/∂activation using the cross-entropy cost function
                 neuron.node_value = predicted_output - expected_output
@@ -279,14 +282,14 @@ class NeuralNetwork:
                 # For MSE cost = (1/2) * Σ(predicted - expected)²
                 # The derivative is: (predicted - expected)
                 cost_derivative = predicted_output - expected_output
-                
+
                 # Calculate ∂activation/∂(weighted_sum)
                 # This is the derivative of the activation function
                 activation_derivative = self.activation_derivative(
                     neuron.last_weighted_sum,
                     neuron.activation_function
                 )
-                
+
                 # Calculate node value using chain rule
                 # node_value = ∂Cost/∂activation × ∂activation/∂(weighted_sum)
                 neuron.node_value = cost_derivative * activation_derivative
@@ -294,15 +297,15 @@ class NeuralNetwork:
                 print(f"Warning: Unknown cost function '{self.cost_function}'. Defaulting to MSE.")
                 #Same as above
                 cost_derivative = predicted_output - expected_output
-                
+
                 activation_derivative = self.activation_derivative(
                     neuron.last_weighted_sum,
                     neuron.activation_function
                 )
-                
-                neuron.node_value = cost_derivative * activation_derivative        
 
-    
+                neuron.node_value = cost_derivative * activation_derivative
+
+
     def backpropagate_output_layer(self, expected_outputs, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, update_weights=True):
         """
         Calculate node values for the output layer neurons and update their weights and biases.
@@ -335,12 +338,15 @@ class NeuralNetwork:
         
         # Calculate node value for each output neuron
         for neuron_idx, neuron in enumerate(self.output_layer):
-            # Get the predicted output (activation) for this neuron
-            predicted_output = neuron.last_output
-            
+            # Get the predicted output (activation) for this neuron. When softmax
+            # is in use, neuron.last_output is the raw pre-softmax linear score,
+            # so the actual predicted probability must come from the network's
+            # post-softmax outputs instead.
+            predicted_output = self.last_outputs[neuron_idx] if self.using_softmax else neuron.last_output
+
             # Get the expected output for this neuron
             expected_output = expected_outputs[neuron_idx]
-            
+
             if self.cost_function == 'cross-entropy':
                 # Calculate ∂Cost/∂activation using the cross-entropy cost function
                 neuron.node_value = predicted_output - expected_output
@@ -349,14 +355,14 @@ class NeuralNetwork:
                 # For MSE cost = (1/2) * Σ(predicted - expected)²
                 # The derivative is: (predicted - expected)
                 cost_derivative = predicted_output - expected_output
-                
+
                 # Calculate ∂activation/∂(weighted_sum)
                 # This is the derivative of the activation function
                 activation_derivative = self.activation_derivative(
                     neuron.last_weighted_sum,
                     neuron.activation_function
                 )
-                
+
                 # Calculate node value using chain rule
                 # node_value = ∂Cost/∂activation × ∂activation/∂(weighted_sum)
                 neuron.node_value = cost_derivative * activation_derivative
@@ -364,12 +370,12 @@ class NeuralNetwork:
                 print(f"Warning: Unknown cost function '{self.cost_function}'. Defaulting to MSE.")
                 #Same as above
                 cost_derivative = predicted_output - expected_output
-                
+
                 activation_derivative = self.activation_derivative(
                     neuron.last_weighted_sum,
                     neuron.activation_function
                 )
-                
+
                 neuron.node_value = cost_derivative * activation_derivative
 
             # ============================================
