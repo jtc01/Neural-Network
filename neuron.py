@@ -13,24 +13,24 @@ class Neuron:
     - Return a single output
     """
     
-    def __init__(self, weights=None, bias=0.0, activation_function='sigmoid'):
+    def __init__(self, weights=None, bias=0.0, activation='sigmoid'):
         """
         Initialize the neuron with weights, bias, and activation function.
         
         Args:
             weights (list): List of weights for each input connection
             bias (float): Bias value to be added before activation
-            activation_function (str): Type of activation function to use
+            activation (str): Type of activation function to use
         """
         self.weights = weights if weights is not None else []
-        self.velocities = [0.0] * len(self.weights)  # For momentum-based updates
+        self.weight_velocities = [0.0] * len(self.weights)  # For momentum-based updates
         self.bias = bias
         self.bias_velocity = 0.0  # For momentum-based updates
         self.weight_gradient_accumulations = [0.0] * len(self.weights)  # For accumulating gradients during backpropagation
         self.weight_squared_gradient_accumulations = [0.0] * len(self.weights)  # For adaptive learning rates (e.g., AdaGrad)
         self.bias_gradient_accumulation = 0.0  # For accumulating bias gradients during backpropagation
         self.bias_squared_gradient_accumulation = 0.0  # For adaptive learning rates (e.g., AdaGrad)
-        self.activation_function = activation_function
+        self.activation = activation
         
         # Store the last computed values for debugging purposes
         self.last_inputs = None
@@ -144,21 +144,21 @@ class Neuron:
         Returns:
             float: Result after applying the activation function
         """
-        if self.activation_function == 'sigmoid':
+        if self.activation == 'sigmoid':
             return self.sigmoid(x)
-        elif self.activation_function == 'relu':
+        elif self.activation == 'relu':
             return self.relu(x)
-        elif self.activation_function == 'leaky_relu':
+        elif self.activation == 'leaky_relu':
             return self.leaky_relu(x)
-        elif self.activation_function == 'tanh':
+        elif self.activation == 'tanh':
             return self.tanh(x)
-        elif self.activation_function == 'linear':
+        elif self.activation == 'linear':
             return self.linear(x)
-        elif self.activation_function == 'exponential':
+        elif self.activation == 'exponential':
             return self.exponential(x)
         else:
             # Default to sigmoid if unknown activation function
-            print(f"Warning: Unknown activation function '{self.activation_function}'. Using sigmoid.")
+            print(f"Warning: Unknown activation function '{self.activation}'. Using sigmoid.")
             return self.sigmoid(x)
     
     def forward(self, inputs, dropout_rate=0.0):
@@ -241,7 +241,7 @@ class Neuron:
         return {
             'weights': self.weights,
             'bias': self.bias,
-            'activation_function': self.activation_function,
+            'activation': self.activation,
             'last_inputs': self.last_inputs,
             'last_weighted_sum': self.last_weighted_sum,
             'last_output': self.last_output,

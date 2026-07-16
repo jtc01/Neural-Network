@@ -8,8 +8,8 @@ class NeuralNetwork:
     """
     A flexible feedforward neural network with variable architecture.
     
-    Architecture: input_size -> hidden_layers -> output_size
-    Example: input_size=2, hidden_layers=[3,4,2], output_size=2 creates:
+    Architecture: input_size -> hidden_layer_sizes -> output_size
+    Example: input_size=2, hidden_layer_sizes=[3,4,2], output_size=2 creates:
     2 inputs -> 3 hidden neurons -> 4 hidden neurons -> 2 hidden neurons -> 2 outputs
     
     This network performs forward propagation through the layers:
@@ -18,7 +18,7 @@ class NeuralNetwork:
     3. Output layer produces final predictions
     """
     
-    def __init__(self, hidden_layers, input_size=2, output_size=2, hidden_activation='sigmoid', output_activation='sigmoid', random_seed=None, cost_function='mse'):
+    def __init__(self, hidden_layer_sizes, input_size=2, output_size=2, hidden_activation='sigmoid', output_activation='sigmoid', random_seed=None, cost_function='mse'):
         """
         Initialize the neural network with random weights and biases.
         
@@ -33,9 +33,9 @@ class NeuralNetwork:
         
         # Store variable architecture parameters
         self.input_size = input_size
-        self.hidden_layers_sizes = hidden_layers.copy()  # Store the architecture
+        self.hidden_layer_sizes = hidden_layer_sizes.copy()  # Store the architecture
         self.output_size = output_size
-        self.num_hidden_layers = len(hidden_layers)
+        self.num_hidden_layers = len(hidden_layer_sizes)
         self.cost_function = cost_function
         
         # Store activation function types
@@ -51,7 +51,7 @@ class NeuralNetwork:
         self.hidden_layers = []  # This will be a list of lists (layers of neurons)
         
         # Create each hidden layer
-        for layer_idx, layer_size in enumerate(hidden_layers):
+        for layer_idx, layer_size in enumerate(hidden_layer_sizes):
             layer_neurons = []
             
             # Determine input size for this layer
@@ -60,30 +60,30 @@ class NeuralNetwork:
                 input_connections = self.input_size
             else:
                 # Subsequent hidden layers take inputs from previous hidden layer
-                input_connections = hidden_layers[layer_idx - 1]
+                input_connections = hidden_layer_sizes[layer_idx - 1]
             
             # Create neurons for this layer
             for neuron_idx in range(layer_size):
                 # Generate random weights for connections to this neuron
                 weights = [random.gauss(0, math.sqrt(2/input_connections)) for _ in range(input_connections)]
-                velocities = [0.0] * len(weights)
+                weight_velocities = [0.0] * len(weights)
                 bias = 0.0  # Initialize bias to 0 for better training stability
                 # Create the neuron and add it to the layer
-                neuron = Neuron(weights=weights, bias=bias, activation_function=hidden_activation)
+                neuron = Neuron(weights=weights, bias=bias, activation=hidden_activation)
                 layer_neurons.append(neuron)
                 #print(f"Hidden Layer {layer_idx+1}, Neuron {neuron_idx+1}: weights={[round(w, 3) for w in weights]}, bias={round(bias, 3)}")
         
             self.hidden_layers.append(layer_neurons)
         
         self.output_layer = []
-        last_hidden_size = hidden_layers[-1] if hidden_layers else self.input_size
+        last_hidden_size = hidden_layer_sizes[-1] if hidden_layer_sizes else self.input_size
 
     
         for i in range(self.output_size):
             weights = [random.gauss(0, math.sqrt(2/last_hidden_size)) for _ in range(last_hidden_size)]
             bias = 0.0  # Initialize bias to 0 for better training stability
             # Create the output neuron
-            neuron = Neuron(weights=weights, bias=bias, activation_function=self.output_activation)
+            neuron = Neuron(weights=weights, bias=bias, activation=self.output_activation)
             self.output_layer.append(neuron)
             
             # Store intermediate values for debugging and visualization
@@ -165,13 +165,13 @@ class NeuralNetwork:
         """
         # CHANGE: Create architecture string for variable layers
         arch_parts = [str(self.input_size)]
-        arch_parts.extend([str(size) for size in self.hidden_layers_sizes])
+        arch_parts.extend([str(size) for size in self.hidden_layer_sizes])
         arch_parts.append(str(self.output_size))
         architecture_string = "-".join(arch_parts)
         
         info = {
             'architecture': architecture_string,
-            'hidden_layers_sizes': self.hidden_layers_sizes,
+            'hidden_layer_sizes': self.hidden_layer_sizes,
             'num_hidden_layers': self.num_hidden_layers,
             'hidden_activation': self.hidden_activation,
             'output_activation': self.output_activation,
@@ -287,7 +287,7 @@ class NeuralNetwork:
                 # This is the derivative of the activation function
                 activation_derivative = self.activation_derivative(
                     neuron.last_weighted_sum,
-                    neuron.activation_function
+                    neuron.activation
                 )
 
                 # Calculate node value using chain rule
@@ -300,7 +300,7 @@ class NeuralNetwork:
 
                 activation_derivative = self.activation_derivative(
                     neuron.last_weighted_sum,
-                    neuron.activation_function
+                    neuron.activation
                 )
 
                 neuron.node_value = cost_derivative * activation_derivative
@@ -360,7 +360,7 @@ class NeuralNetwork:
                 # This is the derivative of the activation function
                 activation_derivative = self.activation_derivative(
                     neuron.last_weighted_sum,
-                    neuron.activation_function
+                    neuron.activation
                 )
 
                 # Calculate node value using chain rule
@@ -373,7 +373,7 @@ class NeuralNetwork:
 
                 activation_derivative = self.activation_derivative(
                     neuron.last_weighted_sum,
-                    neuron.activation_function
+                    neuron.activation
                 )
 
                 neuron.node_value = cost_derivative * activation_derivative
@@ -398,10 +398,10 @@ class NeuralNetwork:
                     weight_gradient = max(min(neuron.weight_gradient_accumulations[weight_idx], weight_clip_value), -weight_clip_value)  # Clip gradients to prevent extreme updates
                     
                     # Update velocity using momentum and gradient descent
-                    neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * weight_gradient
+                    neuron.weight_velocities[weight_idx] = momentum * neuron.weight_velocities[weight_idx] - learning_rate * weight_gradient
 
                     # Update weight using velocity
-                    neuron.weights[weight_idx] += neuron.velocities[weight_idx]
+                    neuron.weights[weight_idx] += neuron.weight_velocities[weight_idx]
             
             # Update bias
             # Gradient for bias = node_value (since bias input is always 1)
@@ -509,7 +509,7 @@ class NeuralNetwork:
                 # Multiply by the activation derivative for this neuron
                 activation_deriv = self.activation_derivative(
                     neuron.last_weighted_sum,
-                    neuron.activation_function
+                    neuron.activation
                 )
                 
                 node_value *= activation_deriv
@@ -579,7 +579,7 @@ class NeuralNetwork:
                 # Multiply by the activation derivative for this neuron
                 activation_deriv = self.activation_derivative(
                     neuron.last_weighted_sum,
-                    neuron.activation_function
+                    neuron.activation
                 )
                 
                 node_value *= activation_deriv
@@ -605,10 +605,10 @@ class NeuralNetwork:
                         weight_gradient = max(min(neuron.weight_gradient_accumulations[weight_idx], weight_clip_value), -weight_clip_value)  # Clip gradients to prevent extreme updates
 
                         # Update velocity using momentum and gradient descent
-                        neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * weight_gradient
+                        neuron.weight_velocities[weight_idx] = momentum * neuron.weight_velocities[weight_idx] - learning_rate * weight_gradient
 
                         # Update weight using velocity
-                        neuron.weights[weight_idx] += neuron.velocities[weight_idx]
+                        neuron.weights[weight_idx] += neuron.weight_velocities[weight_idx]
                 
                 # Update bias
                 # Gradient for bias = node_value × 1 (since bias input is always 1)
@@ -678,8 +678,8 @@ class NeuralNetwork:
                 input_value = neuron.last_inputs[weight_idx]
                 weight_gradient = neuron.node_value * input_value
                 weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else weight_gradient  # Clip gradients if clip value is provided
-                neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * weight_gradient
-                neuron.weights[weight_idx] += neuron.velocities[weight_idx]
+                neuron.weight_velocities[weight_idx] = momentum * neuron.weight_velocities[weight_idx] - learning_rate * weight_gradient
+                neuron.weights[weight_idx] += neuron.weight_velocities[weight_idx]
 
             # Update bias in output layer
             bias_gradient = neuron.node_value
@@ -694,8 +694,8 @@ class NeuralNetwork:
                     input_value = neuron.last_inputs[weight_idx]
                     weight_gradient = neuron.node_value * input_value
                     weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else weight_gradient  # Clip gradients if clip value is provided
-                    neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * weight_gradient
-                    neuron.weights[weight_idx] += neuron.velocities[weight_idx]
+                    neuron.weight_velocities[weight_idx] = momentum * neuron.weight_velocities[weight_idx] - learning_rate * weight_gradient
+                    neuron.weights[weight_idx] += neuron.weight_velocities[weight_idx]
 
                 # Update bias in hidden layers
                 bias_gradient = neuron.node_value
@@ -741,8 +741,8 @@ class NeuralNetwork:
             for weight_idx in range(len(neuron.weights)):
                 avg_weight_gradient = neuron.weight_gradient_accumulations[weight_idx] / batch_size
                 avg_weight_gradient = max(min(avg_weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else avg_weight_gradient  # Clip gradients if clip value is provided
-                neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * avg_weight_gradient
-                neuron.weights[weight_idx] += neuron.velocities[weight_idx]
+                neuron.weight_velocities[weight_idx] = momentum * neuron.weight_velocities[weight_idx] - learning_rate * avg_weight_gradient
+                neuron.weights[weight_idx] += neuron.weight_velocities[weight_idx]
 
             # Update bias in output layer
             avg_bias_gradient = neuron.bias_gradient_accumulation / batch_size
@@ -756,8 +756,8 @@ class NeuralNetwork:
                 for weight_idx in range(len(neuron.weights)):
                     avg_weight_gradient = neuron.weight_gradient_accumulations[weight_idx] / batch_size
                     avg_weight_gradient = max(min(avg_weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else avg_weight_gradient  # Clip gradients if clip value is provided
-                    neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] - learning_rate * avg_weight_gradient
-                    neuron.weights[weight_idx] += neuron.velocities[weight_idx]
+                    neuron.weight_velocities[weight_idx] = momentum * neuron.weight_velocities[weight_idx] - learning_rate * avg_weight_gradient
+                    neuron.weights[weight_idx] += neuron.weight_velocities[weight_idx]
 
                 # Update bias in hidden layers
                 avg_bias_gradient = neuron.bias_gradient_accumulation / batch_size
@@ -788,12 +788,12 @@ class NeuralNetwork:
                 weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else weight_gradient  # Clip gradients if clip value is provided
 
                 # Update first moment (velocity)
-                neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * weight_gradient
+                neuron.weight_velocities[weight_idx] = momentum * neuron.weight_velocities[weight_idx] + (1 - momentum) * weight_gradient
 
                 # Update second moment (squared gradient)
                 neuron.weight_squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (weight_gradient ** 2)
                 # Compute bias-corrected moments
-                velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
+                velocity_corrected = neuron.weight_velocities[weight_idx] / (1 - momentum)
                 squared_gradient_corrected = neuron.weight_squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
                 # Update weight using Adam update rule
                 neuron.weights[weight_idx] -= learning_rate * velocity_corrected / (math.sqrt(squared_gradient_corrected) + 1e-8)
@@ -814,12 +814,12 @@ class NeuralNetwork:
                     weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else weight_gradient  # Clip gradients if clip value is provided
 
                     # Update first moment (velocity)
-                    neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * weight_gradient
+                    neuron.weight_velocities[weight_idx] = momentum * neuron.weight_velocities[weight_idx] + (1 - momentum) * weight_gradient
 
                     # Update second moment (squared gradient)
                     neuron.weight_squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (weight_gradient ** 2)
                     # Compute bias-corrected moments
-                    velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
+                    velocity_corrected = neuron.weight_velocities[weight_idx] / (1 - momentum)
                     squared_gradient_corrected = neuron.weight_squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
 
                     # Update weight using Adam update rule
@@ -921,13 +921,13 @@ class NeuralNetwork:
                 avg_weight_gradient = max(min(avg_weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else avg_weight_gradient  # Clip gradients if clip value is provided
 
                 # Update first moment (velocity)
-                neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * avg_weight_gradient
+                neuron.weight_velocities[weight_idx] = momentum * neuron.weight_velocities[weight_idx] + (1 - momentum) * avg_weight_gradient
 
                 # Update second moment (squared gradient)
                 neuron.weight_squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
 
                 # Compute bias-corrected moments
-                velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
+                velocity_corrected = neuron.weight_velocities[weight_idx] / (1 - momentum)
                 squared_gradient_corrected = neuron.weight_squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
 
                 # Update weight using Adam update rule
@@ -949,13 +949,13 @@ class NeuralNetwork:
                     avg_weight_gradient = max(min(avg_weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else avg_weight_gradient  # Clip gradients if clip value is provided
 
                     # Update first moment (velocity)
-                    neuron.velocities[weight_idx] = momentum * neuron.velocities[weight_idx] + (1 - momentum) * avg_weight_gradient
+                    neuron.weight_velocities[weight_idx] = momentum * neuron.weight_velocities[weight_idx] + (1 - momentum) * avg_weight_gradient
 
                     # Update second moment (squared gradient)
                     neuron.weight_squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (avg_weight_gradient ** 2)
 
                     # Compute bias-corrected moments
-                    velocity_corrected = neuron.velocities[weight_idx] / (1 - momentum)
+                    velocity_corrected = neuron.weight_velocities[weight_idx] / (1 - momentum)
                     squared_gradient_corrected = neuron.weight_squared_gradient_accumulations[weight_idx] / (1 - squared_gradient_term)
 
                     # Update weight using Adam update rule
@@ -1259,8 +1259,8 @@ class NeuralNetwork:
                 layer_data.append({
                 "weights": neuron.weights,
                 "bias": neuron.bias,
-                "velocities": neuron.velocities,
-                "squared_gradient_accumulations": neuron.weight_squared_gradient_accumulations,
+                "weight_velocities": neuron.weight_velocities,
+                "weight_squared_gradient_accumulations": neuron.weight_squared_gradient_accumulations,
                 "bias_velocity": neuron.bias_velocity,
                 "bias_squared_gradient_accumulation": neuron.bias_squared_gradient_accumulation
             })
@@ -1271,8 +1271,8 @@ class NeuralNetwork:
             data["output_layer"].append({
                 "weights": neuron.weights,
                 "bias": neuron.bias,
-                "velocities": neuron.velocities,
-                "squared_gradient_accumulations": neuron.weight_squared_gradient_accumulations,
+                "weight_velocities": neuron.weight_velocities,
+                "weight_squared_gradient_accumulations": neuron.weight_squared_gradient_accumulations,
                 "bias_velocity": neuron.bias_velocity,
                 "bias_squared_gradient_accumulation": neuron.bias_squared_gradient_accumulation
             })
@@ -1305,11 +1305,11 @@ class NeuralNetwork:
                 if len(neuron_data["weights"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
                     print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} weights for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['weights'])}")# Thats one long line of code
                     return
-                if len(neuron_data["velocities"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
-                    print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} velocities for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['velocities'])}")
+                if len(neuron_data["weight_velocities"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
+                    print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} weight_velocities for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['weight_velocities'])}")
                     return
-                if len(neuron_data["squared_gradient_accumulations"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
-                    print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} squared gradient accumulations for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['squared_gradient_accumulations'])}")
+                if len(neuron_data["weight_squared_gradient_accumulations"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
+                    print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} squared gradient accumulations for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['weight_squared_gradient_accumulations'])}")
                     return
                 
         
@@ -1321,11 +1321,11 @@ class NeuralNetwork:
             if len(neuron_data["weights"]) != len(self.output_layer[neuron_idx].weights):
                 print(f"Failed to load network: expected {len(self.output_layer[neuron_idx].weights)} weights for output neuron {neuron_idx+1}, but file has {len(neuron_data['weights'])}")
                 return
-            if len(neuron_data["velocities"]) != len(self.output_layer[neuron_idx].weights):
-                print(f"Failed to load network: expected {len(self.output_layer[neuron_idx].weights)} velocities for output neuron {neuron_idx+1}, but file has {len(neuron_data['velocities'])}")
+            if len(neuron_data["weight_velocities"]) != len(self.output_layer[neuron_idx].weights):
+                print(f"Failed to load network: expected {len(self.output_layer[neuron_idx].weights)} weight_velocities for output neuron {neuron_idx+1}, but file has {len(neuron_data['weight_velocities'])}")
                 return
-            if len(neuron_data["squared_gradient_accumulations"]) != len(self.output_layer[neuron_idx].weights):
-                print(f"Failed to load network: expected {len(self.output_layer[neuron_idx].weights)} squared gradient accumulations for output neuron {neuron_idx+1}, but file has {len(neuron_data['squared_gradient_accumulations'])}")
+            if len(neuron_data["weight_squared_gradient_accumulations"]) != len(self.output_layer[neuron_idx].weights):
+                print(f"Failed to load network: expected {len(self.output_layer[neuron_idx].weights)} squared gradient accumulations for output neuron {neuron_idx+1}, but file has {len(neuron_data['weight_squared_gradient_accumulations'])}")
                 return
             
 
@@ -1334,8 +1334,8 @@ class NeuralNetwork:
             for neuron_idx, neuron_data in enumerate(layer_data):
                 self.hidden_layers[layer_idx][neuron_idx].weights = neuron_data["weights"]
                 self.hidden_layers[layer_idx][neuron_idx].bias = neuron_data["bias"]
-                self.hidden_layers[layer_idx][neuron_idx].velocities = neuron_data["velocities"]
-                self.hidden_layers[layer_idx][neuron_idx].weight_squared_gradient_accumulations = neuron_data["squared_gradient_accumulations"]
+                self.hidden_layers[layer_idx][neuron_idx].weight_velocities = neuron_data["weight_velocities"]
+                self.hidden_layers[layer_idx][neuron_idx].weight_squared_gradient_accumulations = neuron_data["weight_squared_gradient_accumulations"]
                 self.hidden_layers[layer_idx][neuron_idx].bias_velocity = neuron_data["bias_velocity"]
                 self.hidden_layers[layer_idx][neuron_idx].bias_squared_gradient_accumulation = neuron_data["bias_squared_gradient_accumulation"]
 
@@ -1343,8 +1343,8 @@ class NeuralNetwork:
         for neuron_idx, neuron_data in enumerate(data["output_layer"]):
             self.output_layer[neuron_idx].weights = neuron_data["weights"]
             self.output_layer[neuron_idx].bias = neuron_data["bias"]
-            self.output_layer[neuron_idx].velocities = neuron_data["velocities"]
-            self.output_layer[neuron_idx].weight_squared_gradient_accumulations = neuron_data["squared_gradient_accumulations"]
+            self.output_layer[neuron_idx].weight_velocities = neuron_data["weight_velocities"]
+            self.output_layer[neuron_idx].weight_squared_gradient_accumulations = neuron_data["weight_squared_gradient_accumulations"]
             self.output_layer[neuron_idx].bias_velocity = neuron_data["bias_velocity"]
             self.output_layer[neuron_idx].bias_squared_gradient_accumulation = neuron_data["bias_squared_gradient_accumulation"]
 
