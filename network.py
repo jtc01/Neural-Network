@@ -36,6 +36,18 @@ class NeuralNetwork:
         self.hidden_layer_sizes = hidden_layer_sizes.copy()  # Store the architecture
         self.output_size = output_size
         self.num_hidden_layers = len(hidden_layer_sizes)
+
+
+        valid_cross_entropy_activations = ('sigmoid', 'softmax')
+        if cost_function == 'cross-entropy' and output_activation not in valid_cross_entropy_activations:
+            raise ValueError(
+                f"cost_function='cross-entropy' requires output_activation to be "
+                f"'sigmoid' or 'softmax' (got '{output_activation}'). The gradient "
+                f"shortcut used for cross-entropy is only mathematically valid for "
+                f"these two pairings — using it with another activation would "
+                f"silently produce incorrect gradients. Use cost_function='mse' "
+                f"if you want a different output activation."
+            )
         self.cost_function = cost_function
         
         # Store activation function types
@@ -260,6 +272,20 @@ class NeuralNetwork:
         Returns:
             None (stores node values in each output neuron)
         """
+        # Guard: the cross-entropy shortcut (predicted - expected) is only the
+        # correct gradient when paired with 'softmax' or 'sigmoid' output
+        # activations. Using it with any other activation silently produces
+        # incorrect gradients, so refuse rather than compute them.
+        if self.cost_function == 'cross-entropy' and not (self.using_softmax or self.output_activation == 'sigmoid'):
+            raise ValueError(
+                f"cost_function='cross-entropy' requires output_activation to be "
+                f"'sigmoid' or 'softmax' (network is configured with "
+                f"'{self.output_activation}'). The gradient shortcut used for "
+                f"cross-entropy is only mathematically valid for these two "
+                f"pairings — using it with another activation would silently "
+                f"produce incorrect gradients."
+            )
+
         if len(expected_outputs) != len(self.output_layer):
             raise ValueError(f"Expected {len(self.output_layer)} output values, got {len(expected_outputs)}")
         
@@ -332,6 +358,20 @@ class NeuralNetwork:
         Returns:
             None (stores node values and updates weights/biases directly in each output neuron)
         """
+        # Guard: the cross-entropy shortcut (predicted - expected) is only the
+        # correct gradient when paired with 'softmax' or 'sigmoid' output
+        # activations. Using it with any other activation silently produces
+        # incorrect gradients, so refuse rather than compute them.
+        if self.cost_function == 'cross-entropy' and not (self.using_softmax or self.output_activation == 'sigmoid'):
+            raise ValueError(
+                f"cost_function='cross-entropy' requires output_activation to be "
+                f"'sigmoid' or 'softmax' (network is configured with "
+                f"'{self.output_activation}'). The gradient shortcut used for "
+                f"cross-entropy is only mathematically valid for these two "
+                f"pairings — using it with another activation would silently "
+                f"produce incorrect gradients."
+            )
+
         # Validate that we have expected outputs for each output neuron
         if len(expected_outputs) != len(self.output_layer):
             raise ValueError(f"Expected {len(self.output_layer)} output values, got {len(expected_outputs)}")
