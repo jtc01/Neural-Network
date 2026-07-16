@@ -14,7 +14,7 @@ def main():
     test_data = prepare_iris(split='test')    # 30 samples
 
     network = NeuralNetwork(
-        hidden_layers=[],
+        hidden_layer_sizes=[],
         input_size=4,
         output_size=3,
         hidden_activation='relu',

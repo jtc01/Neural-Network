@@ -37,6 +37,13 @@ class Neuron:
         self.last_weighted_sum = None
         self.last_output = None
 
+        # Dropout mask applied on the most recent forward pass:
+        # 0.0 if this neuron was dropped, otherwise 1.0 / (1.0 - dropout_rate)
+        # (or 1.0 when no dropout was used). Backprop must multiply by this
+        # so that dropped neurons contribute zero gradient, matching the fact
+        # that they contributed zero output.
+        self.last_dropout_mask = 1.0
+
         # Node value = ∂Cost/∂(weighted_sum) for this neuron
         self.node_value = 0.0
 
@@ -204,9 +211,17 @@ class Neuron:
         # Step 3: Check for dropout and apply the activation function
         # This introduces non-linearity to the neuron's output
         if random.random() < dropout_rate:
+            # This neuron is dropped for this forward pass. Remember that via
+            # last_dropout_mask so backpropagation can zero out its gradient
+            # too, instead of only zeroing the forward output.
+            self.last_dropout_mask = 0.0
             output = 0.0
         else:
-            output = self.apply_activation(weighted_sum) * (1.0 / (1.0 - dropout_rate))  # Scale output to maintain expected value
+            # Scale output to maintain expected value (inverted dropout).
+            # The same scale factor is remembered so backprop can apply it
+            # to the gradient, keeping forward and backward consistent.
+            self.last_dropout_mask = 1.0 / (1.0 - dropout_rate)
+            output = self.apply_activation(weighted_sum) * self.last_dropout_mask
         
         # Store the output for debugging
         self.last_output = output
@@ -245,5 +260,6 @@ class Neuron:
             'last_inputs': self.last_inputs,
             'last_weighted_sum': self.last_weighted_sum,
             'last_output': self.last_output,
+            'last_dropout_mask': self.last_dropout_mask,
             'node_value': self.node_value
         }

@@ -512,7 +512,13 @@ class NeuralNetwork:
                     neuron.activation
                 )
                 
-                node_value *= activation_deriv
+                # Multiply by this neuron's dropout mask from the forward pass.
+                # If the neuron was dropped (mask == 0.0), it contributed no
+                # output, so it must also contribute no gradient. If it was
+                # kept (mask == 1.0 / (1 - dropout_rate)), the same inverted-
+                # dropout scaling used on the forward pass is applied here too,
+                # keeping forward and backward passes consistent.
+                node_value *= activation_deriv * neuron.last_dropout_mask
                 
                 # Store the calculated node value in the neuron
                 neuron.node_value = node_value
@@ -582,7 +588,13 @@ class NeuralNetwork:
                     neuron.activation
                 )
                 
-                node_value *= activation_deriv
+                # Multiply by this neuron's dropout mask from the forward pass.
+                # If the neuron was dropped (mask == 0.0), it contributed no
+                # output, so it must also contribute no gradient. If it was
+                # kept (mask == 1.0 / (1 - dropout_rate)), the same inverted-
+                # dropout scaling used on the forward pass is applied here too,
+                # keeping forward and backward passes consistent.
+                node_value *= activation_deriv * neuron.last_dropout_mask
                 
                 # Store the calculated node value in the neuron
                 neuron.node_value = node_value
