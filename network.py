@@ -333,129 +333,7 @@ class NeuralNetwork:
                 neuron.node_value = cost_derivative * activation_derivative
 
 
-    def backpropagate_output_layer(self, expected_outputs, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, update_weights=True):
-        """
-        Calculate node values for the output layer neurons and update their weights and biases.
-        
-        For the output layer, the node value is:
-        node_value = ∂Cost/∂(weighted_sum)
-                    = ∂Cost/∂activation × ∂activation/∂(weighted_sum)
-        
-        Where:
-        - ∂Cost/∂activation = (predicted_output - expected_output)  [from MSE cost function]
-        - ∂activation/∂(weighted_sum) = activation_derivative(weighted_sum)
-        
-        After calculating node values, weights are updated using:
-        new_weight = old_weight - learning_rate × node_value × input_to_weight
-        
-        This method assumes forward() has already been called, so each neuron
-        has stored values in last_weighted_sum, last_output, and last_inputs.
-        
-        Args:
-            expected_outputs (list): The expected output values for this data point
-                                    Example: [1, 0] or [0, 1]
-            learning_rate (float): How much to adjust weights and biases
-        
-        Returns:
-            None (stores node values and updates weights/biases directly in each output neuron)
-        """
-        # Guard: the cross-entropy shortcut (predicted - expected) is only the
-        # correct gradient when paired with 'softmax' or 'sigmoid' output
-        # activations. Using it with any other activation silently produces
-        # incorrect gradients, so refuse rather than compute them.
-        if self.cost_function == 'cross-entropy' and not (self.using_softmax or self.output_activation == 'sigmoid'):
-            raise ValueError(
-                f"cost_function='cross-entropy' requires output_activation to be "
-                f"'sigmoid' or 'softmax' (network is configured with "
-                f"'{self.output_activation}'). The gradient shortcut used for "
-                f"cross-entropy is only mathematically valid for these two "
-                f"pairings — using it with another activation would silently "
-                f"produce incorrect gradients."
-            )
-
-        # Validate that we have expected outputs for each output neuron
-        if len(expected_outputs) != len(self.output_layer):
-            raise ValueError(f"Expected {len(self.output_layer)} output values, got {len(expected_outputs)}")
-        
-        # Calculate node value for each output neuron
-        for neuron_idx, neuron in enumerate(self.output_layer):
-            # Get the predicted output (activation) for this neuron. When softmax
-            # is in use, neuron.last_output is the raw pre-softmax linear score,
-            # so the actual predicted probability must come from the network's
-            # post-softmax outputs instead.
-            predicted_output = self.last_outputs[neuron_idx] if self.using_softmax else neuron.last_output
-
-            # Get the expected output for this neuron
-            expected_output = expected_outputs[neuron_idx]
-
-            if self.cost_function == 'cross-entropy':
-                # Calculate ∂Cost/∂activation using the cross-entropy cost function
-                neuron.node_value = predicted_output - expected_output
-            elif self.cost_function == 'mse':
-                # Calculate ∂Cost/∂activation
-                # For MSE cost = (1/2) * Σ(predicted - expected)²
-                # The derivative is: (predicted - expected)
-                cost_derivative = predicted_output - expected_output
-
-                # Calculate ∂activation/∂(weighted_sum)
-                # This is the derivative of the activation function
-                activation_derivative = self.activation_derivative(
-                    neuron.last_weighted_sum,
-                    neuron.activation
-                )
-
-                # Calculate node value using chain rule
-                # node_value = ∂Cost/∂activation × ∂activation/∂(weighted_sum)
-                neuron.node_value = cost_derivative * activation_derivative
-            else:
-                print(f"Warning: Unknown cost function '{self.cost_function}'. Defaulting to MSE.")
-                #Same as above
-                cost_derivative = predicted_output - expected_output
-
-                activation_derivative = self.activation_derivative(
-                    neuron.last_weighted_sum,
-                    neuron.activation
-                )
-
-                neuron.node_value = cost_derivative * activation_derivative
-
-            # ============================================
-            # UPDATE WEIGHTS AND BIAS FOR THIS OUTPUT NEURON
-            # ============================================
-            
-            # Update each weight
-            # Gradient for weight_i = node_value × input_i
-            # The input that flows through weight_i is stored in last_inputs[i]
-            for weight_idx in range(len(neuron.weights)):
-                # Get the input value that this weight receives
-                # For output layer, this is the activation from the last hidden layer
-                input_value = neuron.last_inputs[weight_idx]
-                
-                # Calculate gradient: ∂Cost/∂weight = node_value × input_value
-                neuron.weight_gradient_accumulations[weight_idx] += neuron.node_value * input_value
-
-                if update_weights:
-
-                    weight_gradient = max(min(neuron.weight_gradient_accumulations[weight_idx], weight_clip_value), -weight_clip_value)  # Clip gradients to prevent extreme updates
-                    
-                    # Update velocity using momentum and gradient descent
-                    neuron.weight_velocities[weight_idx] = momentum * neuron.weight_velocities[weight_idx] - learning_rate * weight_gradient
-
-                    # Update weight using velocity
-                    neuron.weights[weight_idx] += neuron.weight_velocities[weight_idx]
-            
-            # Update bias
-            # Gradient for bias = node_value (since bias input is always 1)
-            neuron.bias_gradient_accumulation += neuron.node_value
-
-            if update_weights:
-                bias_gradient = max(min(neuron.bias_gradient_accumulation, bias_clip_value), -bias_clip_value)  # Clip gradients to prevent extreme updates
-
-                # Update bias velocity using momentum and gradient descent
-                neuron.bias_velocity = momentum * neuron.bias_velocity - learning_rate * bias_gradient
-                
-                # Update bias using gradient descent
-                neuron.bias += neuron.bias_velocity
+    
 
     def activation_derivative(self, weighted_sum, activation_function):
         """
@@ -564,117 +442,7 @@ class NeuralNetwork:
                 # Store the calculated node value in the neuron
                 neuron.node_value = node_value
 
-    def backpropagate_hidden_layers(self, learning_rate=0.05, weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9, update_weights=True):
-        """
-        Calculate node values for all hidden layer neurons using backpropagation,
-        then update weights and biases.
-        
-        This method works backwards through the hidden layers, starting from the layer
-        closest to the output and moving towards the input.
-        
-        For each hidden neuron, the node value is:
-        node_value = activation_derivative(weighted_sum) × Σ(weight_to_next × node_value_next)
-        
-        After calculating node values, weights are updated using:
-        new_weight = old_weight - learning_rate × node_value × input_to_weight
-        
-        Where input_to_weight is the activation value that flows through that weight
-        (stored in neuron.last_inputs).
-        
-        Prerequisites:
-        - forward() must have been called (so neurons have last_weighted_sum and last_inputs values)
-        - backpropagate_output_layer() must have been called first
-        
-        Args:
-            learning_rate (float): How much to adjust weights and biases
-        
-        Returns:
-            None (stores node values and updates weights/biases directly in each hidden neuron)
-        """
-       
-        # Process hidden layers in reverse order (from output back to input)
-        # Start from the last hidden layer and move backwards
-        for layer_idx in range(len(self.hidden_layers) - 1, -1, -1):
-            current_layer = self.hidden_layers[layer_idx]
-            
-            # Determine which layer comes after this one
-            if layer_idx == len(self.hidden_layers) - 1:
-                # This is the last hidden layer, so next layer is output layer
-                next_layer = self.output_layer
-            else:
-                # Next layer is the following hidden layer
-                next_layer = self.hidden_layers[layer_idx + 1]
-            
-            # Calculate node value for each neuron in this layer
-            for neuron_idx, neuron in enumerate(current_layer):
-                # Initialize node value to 0
-                node_value = 0.0
-                
-                # Sum contributions from ALL neurons in the next layer
-                for next_neuron_idx, next_neuron in enumerate(next_layer):
-                    # Get the weight connecting this neuron to the next neuron
-                    # The weight is stored in the next neuron's weights array
-                    # at the index corresponding to this neuron's position
-                    weight_to_next = next_neuron.weights[neuron_idx]
-                    
-                    # Get the node value of the next neuron (already calculated)
-                    next_node_value = next_neuron.node_value
-                    
-                    # Add this contribution to the sum
-                    node_value += weight_to_next * next_node_value
-                
-                # Multiply by the activation derivative for this neuron
-                activation_deriv = self.activation_derivative(
-                    neuron.last_weighted_sum,
-                    neuron.activation
-                )
-                
-                # Multiply by this neuron's dropout mask from the forward pass.
-                # If the neuron was dropped (mask == 0.0), it contributed no
-                # output, so it must also contribute no gradient. If it was
-                # kept (mask == 1.0 / (1 - dropout_rate)), the same inverted-
-                # dropout scaling used on the forward pass is applied here too,
-                # keeping forward and backward passes consistent.
-                node_value *= activation_deriv * neuron.last_dropout_mask
-                
-                # Store the calculated node value in the neuron
-                neuron.node_value = node_value
 
-                # ============================================
-                # UPDATE WEIGHTS AND BIAS FOR THIS NEURON
-                # ============================================
-                
-                # Update each weight
-                # Gradient for weight_i = node_value × input_i
-                # The input that flows through weight_i is stored in last_inputs[i]
-                for weight_idx in range(len(neuron.weights)):
-                    # Get the input value that this weight receives
-                    input_value = neuron.last_inputs[weight_idx]
-                    
-                    # Calculate gradient: ∂Cost/∂weight = node_value × input_value
-                    neuron.weight_gradient_accumulations[weight_idx] += neuron.node_value * input_value
-                    
-                    if update_weights:
-                        weight_gradient = max(min(neuron.weight_gradient_accumulations[weight_idx], weight_clip_value), -weight_clip_value)  # Clip gradients to prevent extreme updates
-
-                        # Update velocity using momentum and gradient descent
-                        neuron.weight_velocities[weight_idx] = momentum * neuron.weight_velocities[weight_idx] - learning_rate * weight_gradient
-
-                        # Update weight using velocity
-                        neuron.weights[weight_idx] += neuron.weight_velocities[weight_idx]
-                
-                # Update bias
-                # Gradient for bias = node_value × 1 (since bias input is always 1)
-                # So bias_gradient = node_value
-                neuron.bias_gradient_accumulation += neuron.node_value
-                if update_weights:
-                    bias_gradient = max(min(neuron.bias_gradient_accumulation, bias_clip_value), -bias_clip_value)  # Clip gradients to prevent extreme updates
-
-                    # Update bias velocity using momentum and gradient descent
-                    neuron.bias_velocity = momentum * neuron.bias_velocity - learning_rate * bias_gradient
-                    
-                    # Update bias using gradient descent
-                    neuron.bias += neuron.bias_velocity
 
     def accumulate_gradients(self):
         """
@@ -1166,65 +934,6 @@ class NeuralNetwork:
                 neuron.weight_gradient_accumulations = [0.0 for _ in neuron.weights]
                 neuron.bias_gradient_accumulation = 0.0
 
-    def _apply_optimizer_update(self, optimizer, learning_rate, batch_size, weight_clip_value,
-                                 bias_clip_value, momentum, squared_gradient_term):
-        """
-        Apply one weight update using the currently accumulated gradients with
-        the chosen optimizer, then reset the accumulators.
-
-        `batch_size` should be the actual number of samples whose gradients
-        are currently accumulated, so the averaging in each apply_gradient_
-        accumulations_* method is correct. This is normally the configured
-        mini-batch size, but for a trailing partial batch (see train()) it
-        will be smaller.
-
-        Args:
-            optimizer (str): Which optimizer to use ('sgd', 'adam', 'adagrad', 'rmsprop').
-            learning_rate (float): Learning rate to use for this update.
-            batch_size (int): Number of samples whose gradients were accumulated.
-            weight_clip_value (float): Clamp applied to averaged weight gradients.
-            bias_clip_value (float): Clamp applied to averaged bias gradients.
-            momentum (float): Momentum term (used by 'sgd' and 'adam').
-            squared_gradient_term (float): Second-moment decay term (used by
-                'adam' and 'rmsprop').
-
-        Returns:
-            None (updates weights/biases in place and resets accumulators)
-        """
-        if optimizer == 'adam':
-            self.apply_gradient_accumulations_adam(
-                learning_rate=learning_rate,
-                batch_size=batch_size,
-                weight_clip_value=weight_clip_value,
-                bias_clip_value=bias_clip_value,
-                momentum=momentum,
-                squared_gradient_term=squared_gradient_term
-            )
-        elif optimizer == 'sgd':
-            self.apply_gradient_accumulations_sgd(
-                learning_rate=learning_rate,
-                batch_size=batch_size,
-                weight_clip_value=weight_clip_value,
-                bias_clip_value=bias_clip_value,
-                momentum=momentum
-            )
-        elif optimizer == 'adagrad':
-            self.apply_gradient_accumulations_adagrad(
-                learning_rate=learning_rate,
-                batch_size=batch_size,
-                weight_clip_value=weight_clip_value,
-                bias_clip_value=bias_clip_value
-            )
-        elif optimizer == 'rmsprop':
-            self.apply_gradient_accumulations_RMSprop(
-                learning_rate=learning_rate,
-                batch_size=batch_size,
-                weight_clip_value=weight_clip_value,
-                bias_clip_value=bias_clip_value,
-                squared_gradient_term=squared_gradient_term
-            )
-        self.reset_accumulated_gradients()
-
     def train(self, data, epochs=1, optimizer='adam', initial_learning_rate=0.001,
           learning_rate_decay=1.0, batch_size=32, dropout_rate=0.0,
           weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9,
@@ -1298,12 +1007,41 @@ class NeuralNetwork:
                 self.compute_hidden_node_values()
                 self.accumulate_gradients()
 
-                # Apply weight update at end of each full mini-batch
+                # Apply weight update at end of each batch
                 if (idx + 1) % batch_size == 0:
-                    self._apply_optimizer_update(
-                        optimizer, lr, batch_size, weight_clip_value,
-                        bias_clip_value, momentum, squared_gradient_term
-                    )
+                    if optimizer == 'adam':
+                        self.apply_gradient_accumulations_adam(
+                            learning_rate=lr,
+                            batch_size=batch_size,
+                            weight_clip_value=weight_clip_value,
+                            bias_clip_value=bias_clip_value,
+                            momentum=momentum,
+                            squared_gradient_term=squared_gradient_term
+                        )
+                    elif optimizer == 'sgd':
+                        self.apply_gradient_accumulations_sgd(
+                            learning_rate=lr,
+                            batch_size=batch_size,
+                            weight_clip_value=weight_clip_value,
+                            bias_clip_value=bias_clip_value,
+                            momentum=momentum
+                        )
+                    elif optimizer == 'adagrad':
+                        self.apply_gradient_accumulations_adagrad(
+                            learning_rate=lr,
+                            batch_size=batch_size,
+                            weight_clip_value=weight_clip_value,
+                            bias_clip_value=bias_clip_value
+                        )
+                    elif optimizer == 'rmsprop':
+                        self.apply_gradient_accumulations_RMSprop(
+                            learning_rate=lr,
+                            batch_size=batch_size,
+                            weight_clip_value=weight_clip_value,
+                            bias_clip_value=bias_clip_value,
+                            squared_gradient_term=squared_gradient_term
+                        )
+                    self.reset_accumulated_gradients()
 
                 # Track accuracy and loss
                 predicted_label = self.last_outputs.index(max(self.last_outputs))
@@ -1327,19 +1065,16 @@ class NeuralNetwork:
                         local_accuracy_sum = 0.0
                         local_loss_sum = 0.0
 
-            # Flush the trailing partial mini-batch, if the dataset size isn't
-            # an exact multiple of batch_size, so its accumulated gradients are
-            # applied instead of being discarded by the next epoch's reset.
-            remainder = len(data) % batch_size
-            if remainder != 0:
-                self._apply_optimizer_update(
-                    optimizer, lr, remainder, weight_clip_value,
-                    bias_clip_value, momentum, squared_gradient_term
-                )
+
 
     def save(self, filename):
         """
-        Save the network's weights and biases to a JSON file.
+        Save the network to a JSON file: its full architecture (layer sizes,
+        activation functions, cost function) plus every neuron's weights,
+        bias, and optimizer state. load() uses the architecture section to
+        reconstruct an equivalent network from scratch before restoring the
+        weights, so nothing about the network's shape needs to be known or
+        re-specified by the caller ahead of time.
 
         Args:
             filename (str): Path to the JSON file to save to
@@ -1347,6 +1082,19 @@ class NeuralNetwork:
         import json
 
         data = {
+            "architecture": {
+                "input_size": self.input_size,
+                "hidden_layer_sizes": self.hidden_layer_sizes,
+                "output_size": self.output_size,
+                "hidden_activation": self.hidden_activation,
+                # Report the activation the caller actually asked for. Internally,
+                # softmax is implemented by giving every output neuron a 'linear'
+                # activation and applying softmax across the layer afterwards
+                # (see using_softmax), so self.output_activation alone would
+                # lose that information.
+                "output_activation": 'softmax' if self.using_softmax else self.output_activation,
+                "cost_function": self.cost_function
+            },
             "hidden_layers": [],
             "output_layer": []
         }
@@ -1379,77 +1127,103 @@ class NeuralNetwork:
         with open(filename, "w") as f:
             json.dump(data, f, indent=4)
         print(f"Network saved to {filename}")
-    
-    def load(self, filename):
+
+    @staticmethod
+    def load(filename):
         """
-        Load weights and biases from a JSON file into the existing network.
+        Load a network previously written by save().
+
+        This builds and returns a brand new NeuralNetwork whose architecture
+        (input/output sizes, hidden layer sizes, activation functions, cost
+        function) comes directly from the file's "architecture" section, then
+        overwrites that fresh network's weights, biases, and optimizer state
+        with the saved values. Callers should not construct a NeuralNetwork
+        themselves first; this is a factory method, called on the class
+        itself, e.g.:
+
+            network = NeuralNetwork.load("model.json")
 
         Args:
             filename (str): Path to the JSON file to load from
+
+        Returns:
+            NeuralNetwork: A new network matching the saved architecture and
+                weights, or None if the file is missing its architecture
+                section or its neuron/weight counts don't match it.
         """
         import json
 
         with open(filename, "r") as f:
             data = json.load(f)
 
-        if len(data["hidden_layers"]) != len(self.hidden_layers):
-            print(f"Failed to load network: expected {len(self.hidden_layers)} hidden layers, but file has {len(data['hidden_layers'])}")
-            return
-        
+        if "architecture" not in data:
+            print("Failed to load network: file has no 'architecture' section, "
+                  "so its layer sizes and activation functions are unknown. "
+                  "It may have been saved by an older version of save().")
+            return None
+
+        # Build a fresh network with the exact saved architecture. Its weights
+        # are randomly initialized for now; they get overwritten below.
+        arch = data["architecture"]
+        network = NeuralNetwork(
+            hidden_layer_sizes=arch["hidden_layer_sizes"],
+            input_size=arch["input_size"],
+            output_size=arch["output_size"],
+            hidden_activation=arch["hidden_activation"],
+            output_activation=arch["output_activation"],
+            cost_function=arch["cost_function"]
+        )
+
+        # Sanity-check the saved neuron/weight counts against the architecture
+        # just used to build the network, in case the file was hand-edited or
+        # corrupted after saving.
+        if len(data["hidden_layers"]) != len(network.hidden_layers):
+            print(f"Failed to load network: architecture specifies {len(network.hidden_layers)} hidden layers, but file has {len(data['hidden_layers'])}")
+            return None
+
         for layer_idx, layer_data in enumerate(data["hidden_layers"]):
-            if len(layer_data) != len(self.hidden_layers[layer_idx]):
-                print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx])} neurons in hidden layer {layer_idx+1}, but file has {len(layer_data)}")
-                return
+            if len(layer_data) != len(network.hidden_layers[layer_idx]):
+                print(f"Failed to load network: expected {len(network.hidden_layers[layer_idx])} neurons in hidden layer {layer_idx+1}, but file has {len(layer_data)}")
+                return None
             for neuron_idx, neuron_data in enumerate(layer_data):
-                if len(neuron_data["weights"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
-                    print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} weights for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['weights'])}")# Thats one long line of code
-                    return
-                if len(neuron_data["weight_velocities"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
-                    print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} weight_velocities for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['weight_velocities'])}")
-                    return
-                if len(neuron_data["weight_squared_gradient_accumulations"]) != len(self.hidden_layers[layer_idx][neuron_idx].weights):
-                    print(f"Failed to load network: expected {len(self.hidden_layers[layer_idx][neuron_idx].weights)} squared gradient accumulations for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['weight_squared_gradient_accumulations'])}")
-                    return
-                
-        
-        if len(data["output_layer"]) != len(self.output_layer):
-            print(f"Failed to load network: expected {len(self.output_layer)} neurons in output layer, but file has {len(data['output_layer'])}")
-            return
-        
-        for neuron_idx, neuron_data in enumerate(data["output_layer"]):
-            if len(neuron_data["weights"]) != len(self.output_layer[neuron_idx].weights):
-                print(f"Failed to load network: expected {len(self.output_layer[neuron_idx].weights)} weights for output neuron {neuron_idx+1}, but file has {len(neuron_data['weights'])}")
-                return
-            if len(neuron_data["weight_velocities"]) != len(self.output_layer[neuron_idx].weights):
-                print(f"Failed to load network: expected {len(self.output_layer[neuron_idx].weights)} weight_velocities for output neuron {neuron_idx+1}, but file has {len(neuron_data['weight_velocities'])}")
-                return
-            if len(neuron_data["weight_squared_gradient_accumulations"]) != len(self.output_layer[neuron_idx].weights):
-                print(f"Failed to load network: expected {len(self.output_layer[neuron_idx].weights)} squared gradient accumulations for output neuron {neuron_idx+1}, but file has {len(neuron_data['weight_squared_gradient_accumulations'])}")
-                return
-            
+                expected_weight_count = len(network.hidden_layers[layer_idx][neuron_idx].weights)
+                if len(neuron_data["weights"]) != expected_weight_count:
+                    print(f"Failed to load network: expected {expected_weight_count} weights for neuron {neuron_idx+1} in hidden layer {layer_idx+1}, but file has {len(neuron_data['weights'])}")
+                    return None
 
-        # Load hidden layer weights and biases
+        if len(data["output_layer"]) != len(network.output_layer):
+            print(f"Failed to load network: architecture specifies {len(network.output_layer)} output neurons, but file has {len(data['output_layer'])}")
+            return None
+
+        for neuron_idx, neuron_data in enumerate(data["output_layer"]):
+            expected_weight_count = len(network.output_layer[neuron_idx].weights)
+            if len(neuron_data["weights"]) != expected_weight_count:
+                print(f"Failed to load network: expected {expected_weight_count} weights for output neuron {neuron_idx+1}, but file has {len(neuron_data['weights'])}")
+                return None
+
+        # Overwrite the freshly-initialized weights/biases/optimizer state
+        # with the saved values
         for layer_idx, layer_data in enumerate(data["hidden_layers"]):
             for neuron_idx, neuron_data in enumerate(layer_data):
-                self.hidden_layers[layer_idx][neuron_idx].weights = neuron_data["weights"]
-                self.hidden_layers[layer_idx][neuron_idx].bias = neuron_data["bias"]
-                self.hidden_layers[layer_idx][neuron_idx].weight_velocities = neuron_data["weight_velocities"]
-                self.hidden_layers[layer_idx][neuron_idx].weight_squared_gradient_accumulations = neuron_data["weight_squared_gradient_accumulations"]
-                self.hidden_layers[layer_idx][neuron_idx].bias_velocity = neuron_data["bias_velocity"]
-                self.hidden_layers[layer_idx][neuron_idx].bias_squared_gradient_accumulation = neuron_data["bias_squared_gradient_accumulation"]
+                neuron = network.hidden_layers[layer_idx][neuron_idx]
+                neuron.weights = neuron_data["weights"]
+                neuron.bias = neuron_data["bias"]
+                neuron.weight_velocities = neuron_data["weight_velocities"]
+                neuron.weight_squared_gradient_accumulations = neuron_data["weight_squared_gradient_accumulations"]
+                neuron.bias_velocity = neuron_data["bias_velocity"]
+                neuron.bias_squared_gradient_accumulation = neuron_data["bias_squared_gradient_accumulation"]
 
-        # Load output layer weights and biases
         for neuron_idx, neuron_data in enumerate(data["output_layer"]):
-            self.output_layer[neuron_idx].weights = neuron_data["weights"]
-            self.output_layer[neuron_idx].bias = neuron_data["bias"]
-            self.output_layer[neuron_idx].weight_velocities = neuron_data["weight_velocities"]
-            self.output_layer[neuron_idx].weight_squared_gradient_accumulations = neuron_data["weight_squared_gradient_accumulations"]
-            self.output_layer[neuron_idx].bias_velocity = neuron_data["bias_velocity"]
-            self.output_layer[neuron_idx].bias_squared_gradient_accumulation = neuron_data["bias_squared_gradient_accumulation"]
-
-
+            neuron = network.output_layer[neuron_idx]
+            neuron.weights = neuron_data["weights"]
+            neuron.bias = neuron_data["bias"]
+            neuron.weight_velocities = neuron_data["weight_velocities"]
+            neuron.weight_squared_gradient_accumulations = neuron_data["weight_squared_gradient_accumulations"]
+            neuron.bias_velocity = neuron_data["bias_velocity"]
+            neuron.bias_squared_gradient_accumulation = neuron_data["bias_squared_gradient_accumulation"]
 
         print(f"Network loaded from {filename}")
+        return network
         
 
 
