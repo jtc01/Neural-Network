@@ -385,7 +385,7 @@ class NeuralNetwork:
 
         Prerequisites:
         - forward() must have been called (so neurons have last_weighted_sum and last_inputs values)
-        - backpropagate_output_layer() must have been called first
+        - compute_output_node_values() must have been called first
 
         Args:
             None (uses stored values in neurons)
@@ -934,6 +934,65 @@ class NeuralNetwork:
                 neuron.weight_gradient_accumulations = [0.0 for _ in neuron.weights]
                 neuron.bias_gradient_accumulation = 0.0
 
+    def _apply_optimizer_update(self, optimizer, learning_rate, batch_size, weight_clip_value,
+                                 bias_clip_value, momentum, squared_gradient_term):
+        """
+        Apply one weight update using the currently accumulated gradients with
+        the chosen optimizer, then reset the accumulators.
+
+        `batch_size` should be the actual number of samples whose gradients
+        are currently accumulated, so the averaging in each apply_gradient_
+        accumulations_* method is correct. This is normally the configured
+        mini-batch size, but for a trailing partial batch (see train()) it
+        will be smaller.
+
+        Args:
+            optimizer (str): Which optimizer to use ('sgd', 'adam', 'adagrad', 'rmsprop').
+            learning_rate (float): Learning rate to use for this update.
+            batch_size (int): Number of samples whose gradients were accumulated.
+            weight_clip_value (float): Clamp applied to averaged weight gradients.
+            bias_clip_value (float): Clamp applied to averaged bias gradients.
+            momentum (float): Momentum term (used by 'sgd' and 'adam').
+            squared_gradient_term (float): Second-moment decay term (used by
+                'adam' and 'rmsprop').
+
+        Returns:
+            None (updates weights/biases in place and resets accumulators)
+        """
+        if optimizer == 'adam':
+            self.apply_gradient_accumulations_adam(
+                learning_rate=learning_rate,
+                batch_size=batch_size,
+                weight_clip_value=weight_clip_value,
+                bias_clip_value=bias_clip_value,
+                momentum=momentum,
+                squared_gradient_term=squared_gradient_term
+            )
+        elif optimizer == 'sgd':
+            self.apply_gradient_accumulations_sgd(
+                learning_rate=learning_rate,
+                batch_size=batch_size,
+                weight_clip_value=weight_clip_value,
+                bias_clip_value=bias_clip_value,
+                momentum=momentum
+            )
+        elif optimizer == 'adagrad':
+            self.apply_gradient_accumulations_adagrad(
+                learning_rate=learning_rate,
+                batch_size=batch_size,
+                weight_clip_value=weight_clip_value,
+                bias_clip_value=bias_clip_value
+            )
+        elif optimizer == 'rmsprop':
+            self.apply_gradient_accumulations_RMSprop(
+                learning_rate=learning_rate,
+                batch_size=batch_size,
+                weight_clip_value=weight_clip_value,
+                bias_clip_value=bias_clip_value,
+                squared_gradient_term=squared_gradient_term
+            )
+        self.reset_accumulated_gradients()
+
     def train(self, data, epochs=1, optimizer='adam', initial_learning_rate=0.001,
           learning_rate_decay=1.0, batch_size=32, dropout_rate=0.0,
           weight_clip_value=5.0, bias_clip_value=10.0, momentum=0.9,
@@ -1007,41 +1066,12 @@ class NeuralNetwork:
                 self.compute_hidden_node_values()
                 self.accumulate_gradients()
 
-                # Apply weight update at end of each batch
+                # Apply weight update at end of each full mini-batch
                 if (idx + 1) % batch_size == 0:
-                    if optimizer == 'adam':
-                        self.apply_gradient_accumulations_adam(
-                            learning_rate=lr,
-                            batch_size=batch_size,
-                            weight_clip_value=weight_clip_value,
-                            bias_clip_value=bias_clip_value,
-                            momentum=momentum,
-                            squared_gradient_term=squared_gradient_term
-                        )
-                    elif optimizer == 'sgd':
-                        self.apply_gradient_accumulations_sgd(
-                            learning_rate=lr,
-                            batch_size=batch_size,
-                            weight_clip_value=weight_clip_value,
-                            bias_clip_value=bias_clip_value,
-                            momentum=momentum
-                        )
-                    elif optimizer == 'adagrad':
-                        self.apply_gradient_accumulations_adagrad(
-                            learning_rate=lr,
-                            batch_size=batch_size,
-                            weight_clip_value=weight_clip_value,
-                            bias_clip_value=bias_clip_value
-                        )
-                    elif optimizer == 'rmsprop':
-                        self.apply_gradient_accumulations_RMSprop(
-                            learning_rate=lr,
-                            batch_size=batch_size,
-                            weight_clip_value=weight_clip_value,
-                            bias_clip_value=bias_clip_value,
-                            squared_gradient_term=squared_gradient_term
-                        )
-                    self.reset_accumulated_gradients()
+                    self._apply_optimizer_update(
+                        optimizer, lr, batch_size, weight_clip_value,
+                        bias_clip_value, momentum, squared_gradient_term
+                    )
 
                 # Track accuracy and loss
                 predicted_label = self.last_outputs.index(max(self.last_outputs))
@@ -1065,7 +1095,15 @@ class NeuralNetwork:
                         local_accuracy_sum = 0.0
                         local_loss_sum = 0.0
 
-
+            # Flush the trailing partial mini-batch, if the dataset size isn't
+            # an exact multiple of batch_size, so its accumulated gradients are
+            # applied instead of being discarded by the next epoch's reset.
+            remainder = len(data) % batch_size
+            if remainder != 0:
+                self._apply_optimizer_update(
+                    optimizer, lr, remainder, weight_clip_value,
+                    bias_clip_value, momentum, squared_gradient_term
+                )
 
     def save(self, filename):
         """
@@ -1095,6 +1133,12 @@ class NeuralNetwork:
                 "output_activation": 'softmax' if self.using_softmax else self.output_activation,
                 "cost_function": self.cost_function
             },
+            # Adam's bias correction depends on how many optimizer steps have
+            # been taken so far (see apply_gradient_accumulations_adam /
+            # update_weights_adam). Persisting it means resuming training
+            # with 'adam' after a load() doesn't restart bias correction from
+            # step 1 and over-correct already-warmed-up moment estimates.
+            "adam_step": self.adam_step,
             "hidden_layers": [],
             "output_layer": []
         }
@@ -1173,6 +1217,11 @@ class NeuralNetwork:
             output_activation=arch["output_activation"],
             cost_function=arch["cost_function"]
         )
+
+        # Restore Adam's step counter so resumed training doesn't restart
+        # bias correction from step 1 (see the note in save()). Older files
+        # saved before this fix won't have the key, so default to 0.
+        network.adam_step = data.get("adam_step", 0)
 
         # Sanity-check the saved neuron/weight counts against the architecture
         # just used to build the network, in case the file was hand-edited or
