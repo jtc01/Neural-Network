@@ -203,7 +203,12 @@ class NeuralNetwork:
             'hidden_layer_sizes': self.hidden_layer_sizes,
             'num_hidden_layers': self.num_hidden_layers,
             'hidden_activation': self.hidden_activation,
-            'output_activation': self.output_activation,
+            # Report the activation actually requested by the caller. Internally,
+            # softmax is implemented by giving every output neuron a 'linear'
+            # activation and applying softmax across the layer afterwards (see
+            # using_softmax), so self.output_activation alone would report
+            # 'linear' even when softmax is in use.
+            'output_activation': 'softmax' if self.using_softmax else self.output_activation,
             'last_inputs': self.last_inputs,
             'last_hidden_outputs': self.last_hidden_outputs,
             'last_outputs': self.last_outputs,
