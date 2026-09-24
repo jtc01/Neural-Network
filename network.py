@@ -77,7 +77,8 @@ class NeuralNetwork:
             # Create neurons for this layer
             for neuron_idx in range(layer_size):
                 # Generate random weights for connections to this neuron
-                weights = [random.gauss(0, math.sqrt(2/input_connections)) for _ in range(input_connections)]
+                std = self._weight_init_std(hidden_activation, input_connections, layer_size)
+                weights = [random.gauss(0, std) for _ in range(input_connections)]
                 weight_velocities = [0.0] * len(weights)
                 bias = 0.0  # Initialize bias to 0 for better training stability
                 # Create the neuron and add it to the layer
@@ -92,7 +93,8 @@ class NeuralNetwork:
 
     
         for i in range(self.output_size):
-            weights = [random.gauss(0, math.sqrt(2/last_hidden_size)) for _ in range(last_hidden_size)]
+            std = self._weight_init_std(self.output_activation, last_hidden_size, self.output_size)
+            weights = [random.gauss(0, std) for _ in range(last_hidden_size)]
             bias = 0.0  # Initialize bias to 0 for better training stability
             # Create the output neuron
             neuron = Neuron(weights=weights, bias=bias, activation=self.output_activation)
@@ -105,6 +107,20 @@ class NeuralNetwork:
 
         self.cost = 0.0
         self.adam_step = 0
+
+    @staticmethod
+    def _weight_init_std(activation, fan_in, fan_out):
+        """
+        Pick a weight-init standard deviation appropriate for the given
+        activation function (He for ReLU-family, Glorot/Xavier otherwise).
+        """
+        if activation in ('relu', 'leaky_relu'):
+            return math.sqrt(2 / fan_in)                 # He/Kaiming
+        elif activation in ('sigmoid', 'tanh', 'linear', 'exponential'):
+            return math.sqrt(2 / (fan_in + fan_out))      # Glorot/Xavier
+        else:
+            print(f"Warning: Unknown activation '{activation}' for weight initialization. Using He initialization.")
+            return math.sqrt(2 / fan_in)
     
     def forward(self, inputs, dropout_rate=0.0):
         """
@@ -659,6 +675,67 @@ class NeuralNetwork:
                 bias_velocity_corrected = neuron.bias_velocity / bias_correction_1
                 bias_squared_gradient_corrected = neuron.bias_squared_gradient_accumulation / bias_correction_2
                 neuron.bias -= learning_rate * bias_velocity_corrected / (math.sqrt(bias_squared_gradient_corrected) + 1e-8)
+
+    def update_weights_rmsprop(self, learning_rate=0.001, weight_clip_value=5.0, bias_clip_value=10.0, squared_gradient_term=0.999):
+        """
+        Updates the weights and biases of all neurons in the network using the
+        RMSprop optimization algorithm on a single sample's gradients (no
+        mini-batch averaging). RMSprop divides the learning rate by a running
+        average of the magnitude of recent squared gradients for each
+        parameter, which helps stabilize updates when gradients vary widely
+        in scale.
+
+        This is the single-sample counterpart to apply_gradient_accumulations_
+        RMSprop, matching the update_weights_sgd/update_weights_adam/
+        update_weights_adagrad pattern: it applies node_value * input_value
+        directly, rather than an averaged mini-batch accumulation.
+
+        This function should be called after compute_output_node_values() and
+        compute_hidden_node_values() have been called to ensure that each
+        neuron has a valid node value before updating.
+
+        Args:
+            learning_rate (float): The base learning rate. Default: 0.001.
+            weight_clip_value (float or None): If provided, weight gradients are
+                clamped to [-weight_clip_value, weight_clip_value]. If None, no
+                clipping is applied.
+            bias_clip_value (float or None): If provided, bias gradients are
+                clamped to [-bias_clip_value, bias_clip_value]. If None, no
+                clipping is applied.
+            squared_gradient_term (float): Controls the decay rate of the running
+                average of squared gradients. Default: 0.999.
+
+        Returns:
+            None: Weights and biases are updated directly inside each neuron.
+        """
+        for neuron in self.output_layer:
+            for weight_idx in range(len(neuron.weights)):
+                input_value = neuron.last_inputs[weight_idx]
+                weight_gradient = neuron.node_value * input_value
+                weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else weight_gradient
+
+                neuron.weight_squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (weight_gradient ** 2)
+                neuron.weights[weight_idx] -= learning_rate * weight_gradient / (math.sqrt(neuron.weight_squared_gradient_accumulations[weight_idx]) + 1e-8)
+
+            bias_gradient = neuron.node_value
+            bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else bias_gradient
+            neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (bias_gradient ** 2)
+            neuron.bias -= learning_rate * bias_gradient / (math.sqrt(neuron.bias_squared_gradient_accumulation) + 1e-8)
+
+        for layer in self.hidden_layers:
+            for neuron in layer:
+                for weight_idx in range(len(neuron.weights)):
+                    input_value = neuron.last_inputs[weight_idx]
+                    weight_gradient = neuron.node_value * input_value
+                    weight_gradient = max(min(weight_gradient, weight_clip_value), -weight_clip_value) if weight_clip_value is not None else weight_gradient
+
+                    neuron.weight_squared_gradient_accumulations[weight_idx] = squared_gradient_term * neuron.weight_squared_gradient_accumulations[weight_idx] + (1 - squared_gradient_term) * (weight_gradient ** 2)
+                    neuron.weights[weight_idx] -= learning_rate * weight_gradient / (math.sqrt(neuron.weight_squared_gradient_accumulations[weight_idx]) + 1e-8)
+
+                bias_gradient = neuron.node_value
+                bias_gradient = max(min(bias_gradient, bias_clip_value), -bias_clip_value) if bias_clip_value is not None else bias_gradient
+                neuron.bias_squared_gradient_accumulation = squared_gradient_term * neuron.bias_squared_gradient_accumulation + (1 - squared_gradient_term) * (bias_gradient ** 2)
+                neuron.bias -= learning_rate * bias_gradient / (math.sqrt(neuron.bias_squared_gradient_accumulation) + 1e-8)
 
     def update_weights_adagrad(self, learning_rate=0.01, weight_clip_value=5.0, bias_clip_value=10.0):
         """
