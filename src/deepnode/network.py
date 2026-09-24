@@ -1,6 +1,6 @@
 import math
 import random
-from neuron import Neuron
+from .neuron import Neuron
 
 
 
