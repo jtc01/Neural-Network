@@ -1,4 +1,4 @@
-from network import NeuralNetwork
+from src.nodeai.network import NeuralNetwork
 from testing.data import DataPoint
 import random
 

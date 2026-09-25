@@ -1,5 +1,5 @@
 import random
-from network import NeuralNetwork
+from src.nodeai.network import NeuralNetwork
 from datasets import load_dataset
 import math
 

@@ -1,5 +1,5 @@
 from datasets import load_dataset
-from network import NeuralNetwork
+from src.nodeai.network import NeuralNetwork
 import math
 
 def main():

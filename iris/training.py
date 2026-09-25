@@ -1,7 +1,7 @@
 import random
 import math
 
-from network import NeuralNetwork
+from src.nodeai.network import NeuralNetwork
 from iris.data import prepare_iris
 
 MAX_EPOCHS = 300

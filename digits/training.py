@@ -1,6 +1,6 @@
 import random
 
-from network import NeuralNetwork
+from src.nodeai.network import NeuralNetwork
 import math
 
 # EPOCHS 1 and 2 work, 3, 4, and 5 do not. Need to retrain using leaky relu.

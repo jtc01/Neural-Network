@@ -1356,13 +1356,3 @@ class NeuralNetwork:
         print(f"Network loaded from {filename}")
         return network
         
-
-
-
-"""
-Journal
-9/26 Making a map wasn't actually that useful for the neuron
-9/27 About to run the code for the first time
-9/29 I don't wanna start learning
-10/5 I just added a ton of stuff without testing yolo
-"""
