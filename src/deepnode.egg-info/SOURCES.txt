@@ -1,0 +1,10 @@
+LICENSE
+README.md
+pyproject.toml
+src/deepnode/__init__.py
+src/deepnode/network.py
+src/deepnode/neuron.py
+src/deepnode.egg-info/PKG-INFO
+src/deepnode.egg-info/SOURCES.txt
+src/deepnode.egg-info/dependency_links.txt
+src/deepnode.egg-info/top_level.txt
