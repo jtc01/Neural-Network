@@ -38,6 +38,16 @@ class NeuralNetwork:
         self.num_hidden_layers = len(hidden_layer_sizes)
 
 
+        valid_cost_functions = ('mse', 'cross-entropy')
+        if cost_function not in valid_cost_functions:
+            raise ValueError(
+                f"Unknown cost_function '{cost_function}'. Choose 'mse' or "
+                f"'cross-entropy'. An unrecognized value would otherwise pass "
+                f"silently here and only surface later as a runtime warning "
+                f"inside compute_output_node_values(), after weights have "
+                f"already been randomly initialized."
+            )
+
         valid_cross_entropy_activations = ('sigmoid', 'softmax')
         if cost_function == 'cross-entropy' and output_activation not in valid_cross_entropy_activations:
             raise ValueError(
@@ -1072,6 +1082,16 @@ class NeuralNetwork:
                 weight_clip_value=weight_clip_value,
                 bias_clip_value=bias_clip_value,
                 squared_gradient_term=squared_gradient_term
+            )
+        else:
+            # Fail loudly rather than silently discarding the accumulated
+            # gradients with no weight update at all. train() already
+            # validates the optimizer name before ever calling this method,
+            # but _apply_optimizer_update can be called directly, and a typo
+            # here would otherwise reset the accumulators with no update and
+            # no error -- a hard-to-notice training bug.
+            raise ValueError(
+                f"Unknown optimizer '{optimizer}'. Choose 'sgd', 'adam', 'adagrad', or 'rmsprop'."
             )
         self.reset_accumulated_gradients()
 
