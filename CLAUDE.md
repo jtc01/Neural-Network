@@ -1,1 +1,0 @@
-A feedforward neural network implemented from scratch in Python, with no ML framework dependencies. The core library (`neuron.py`, `network.py`) is used by three consumers: MNIST digit recognition scripts, a simple 2-input test harness, and a Flask REST API.
