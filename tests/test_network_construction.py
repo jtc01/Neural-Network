@@ -1,5 +1,5 @@
 """
-Unit tests for deepnode.NeuralNetwork construction, weight initialization,
+Unit tests for gradwave.NeuralNetwork construction, weight initialization,
 and forward()-level edge cases.
 
 Backprop/gradient correctness lives in test_gradient_checking.py; optimizer
@@ -13,7 +13,7 @@ import statistics
 
 import pytest
 
-from deepnode import NeuralNetwork
+from gradwave import NeuralNetwork
 
 
 # ---------------------------------------------------------------------------

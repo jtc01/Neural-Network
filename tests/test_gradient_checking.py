@@ -1,5 +1,5 @@
 """
-Numerical gradient checking for deepnode.NeuralNetwork.
+Numerical gradient checking for gradwave.NeuralNetwork.
 
 This is the most important test file in the suite: it verifies that
 compute_output_node_values() / compute_hidden_node_values() actually compute
@@ -13,7 +13,7 @@ import math
 
 import pytest
 
-from deepnode import NeuralNetwork
+from gradwave import NeuralNetwork
 
 
 EPSILON = 1e-5

@@ -1,4 +1,4 @@
-# deepnode
+# gradient-wave
 
 A small, dependency-free feedforward neural network library written in pure
 Python — a from-first-principles implementation of neurons, activation
@@ -36,7 +36,7 @@ other numerical libraries required.
 ## Installation
 
 ```bash
-pip install deepnode
+pip install gradient-wave
 ```
 
 If you're installing from a local clone instead:
@@ -47,10 +47,13 @@ cd Neural-Network
 pip install .
 ```
 
+The PyPI package is named `gradient-wave`, but the importable Python package
+is `gradwave` (see Quick start below).
+
 ## Quick start
 
 ```python
-from deepnode import NeuralNetwork
+from gradwave import NeuralNetwork
 
 # 2 inputs -> one hidden layer of 4 neurons -> 2 outputs
 network = NeuralNetwork(
@@ -88,9 +91,9 @@ loaded_network = NeuralNetwork.load("model.json")
 
 ## Project structure
 
-- `src/deepnode/neuron.py` — the `Neuron` class: weights, bias, activation
+- `src/gradwave/neuron.py` — the `Neuron` class: weights, bias, activation
   function, and the per-neuron forward pass
-- `src/deepnode/network.py` — the `NeuralNetwork` class: layer construction,
+- `src/gradwave/network.py` — the `NeuralNetwork` class: layer construction,
   forward propagation, backpropagation, optimizers, and training
 - `tests/` — the pytest test suite: unit tests for `Neuron` and
   `NeuralNetwork` construction, numerical gradient checking against every

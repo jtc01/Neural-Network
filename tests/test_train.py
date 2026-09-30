@@ -1,5 +1,5 @@
 """
-Tests for deepnode.NeuralNetwork.train(): batching/epoch edge cases, the
+Tests for gradwave.NeuralNetwork.train(): batching/epoch edge cases, the
 learning-rate decay schedule, optimizer-name validation, dropout wiring, and
 a convergence smoke test for every optimizer.
 
@@ -13,7 +13,7 @@ import math
 
 import pytest
 
-from deepnode import NeuralNetwork
+from gradwave import NeuralNetwork
 
 
 def _toy_data(n):
@@ -206,7 +206,7 @@ class TestDropoutWiring:
         # positive dropout_rate, so every hidden neuron must be dropped on
         # whichever forward pass this forces -- this only happens at all if
         # train() actually threads dropout_rate through to forward().
-        monkeypatch.setattr('deepnode.neuron.random.random', lambda: 0.0)
+        monkeypatch.setattr('gradwave.neuron.random.random', lambda: 0.0)
 
         net = NeuralNetwork(hidden_layer_sizes=[4], input_size=2, output_size=2, random_seed=1)
         data = [([0.1, 0.2], [1.0, 0.0]), ([0.3, 0.4], [0.0, 1.0])]
@@ -216,7 +216,7 @@ class TestDropoutWiring:
         assert all(n.last_dropout_mask == 0.0 for n in net.hidden_layers[0])
 
     def test_dropout_rate_zero_never_drops_during_training(self, monkeypatch):
-        monkeypatch.setattr('deepnode.neuron.random.random', lambda: 0.0)
+        monkeypatch.setattr('gradwave.neuron.random.random', lambda: 0.0)
 
         net = NeuralNetwork(hidden_layer_sizes=[4], input_size=2, output_size=2, random_seed=1)
         data = [([0.1, 0.2], [1.0, 0.0])]

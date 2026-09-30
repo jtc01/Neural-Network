@@ -1,5 +1,5 @@
 """
-Unit tests for deepnode.Neuron.
+Unit tests for gradwave.Neuron.
 
 These tests cover construction defaults, every activation function
 (including the unknown-activation fallback), forward-pass edge cases
@@ -11,7 +11,7 @@ import random
 
 import pytest
 
-from deepnode import Neuron
+from gradwave import Neuron
 
 
 # ---------------------------------------------------------------------------

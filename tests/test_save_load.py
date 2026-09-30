@@ -1,5 +1,5 @@
 """
-Tests for deepnode.NeuralNetwork.save() / NeuralNetwork.load().
+Tests for gradwave.NeuralNetwork.save() / NeuralNetwork.load().
 
 load() is a @staticmethod factory: it builds a brand-new network from the
 saved "architecture" section, then overwrites its weights/biases/optimizer
@@ -16,7 +16,7 @@ import math
 
 import pytest
 
-from deepnode import NeuralNetwork
+from gradwave import NeuralNetwork
 
 
 TEST_INPUT = [0.3, -0.6, 0.9]

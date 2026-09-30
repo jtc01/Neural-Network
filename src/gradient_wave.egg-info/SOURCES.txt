@@ -1,0 +1,16 @@
+LICENSE
+README.md
+pyproject.toml
+src/gradient_wave.egg-info/PKG-INFO
+src/gradient_wave.egg-info/SOURCES.txt
+src/gradient_wave.egg-info/dependency_links.txt
+src/gradient_wave.egg-info/top_level.txt
+src/gradwave/__init__.py
+src/gradwave/network.py
+src/gradwave/neuron.py
+tests/test_gradient_checking.py
+tests/test_network_construction.py
+tests/test_neuron.py
+tests/test_optimizers.py
+tests/test_save_load.py
+tests/test_train.py

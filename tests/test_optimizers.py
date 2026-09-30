@@ -1,5 +1,5 @@
 """
-Tests for every optimizer in deepnode.NeuralNetwork: SGD, Adam, AdaGrad, and
+Tests for every optimizer in gradwave.NeuralNetwork: SGD, Adam, AdaGrad, and
 RMSprop, in both their single-sample (update_weights_*) and batched
 (apply_gradient_accumulations_*) forms, plus the shared machinery around
 them (_apply_optimizer_update dispatch, accumulate_gradients,
@@ -16,7 +16,7 @@ import math
 
 import pytest
 
-from deepnode import NeuralNetwork
+from gradwave import NeuralNetwork
 
 
 def _single_output_neuron_network(weights, bias=0.0, input_size=None):
