@@ -8,3 +8,9 @@ src/deepnode.egg-info/PKG-INFO
 src/deepnode.egg-info/SOURCES.txt
 src/deepnode.egg-info/dependency_links.txt
 src/deepnode.egg-info/top_level.txt
+tests/test_gradient_checking.py
+tests/test_network_construction.py
+tests/test_neuron.py
+tests/test_optimizers.py
+tests/test_save_load.py
+tests/test_train.py

@@ -1,4 +1,4 @@
-# Neural Network
+# deepnode
 
 A small, dependency-free feedforward neural network library written in pure
 Python — a from-first-principles implementation of neurons, activation
@@ -12,6 +12,9 @@ other numerical libraries required.
 - **Activation functions** — sigmoid, ReLU, leaky ReLU, tanh, linear, and
   softmax (softmax is applied at the output layer only, since it depends on
   all output neurons jointly rather than one neuron at a time)
+- **Activation-aware weight initialization** — He/Kaiming initialization for
+  ReLU-family activations, Glorot/Xavier initialization otherwise, chosen
+  automatically based on each layer's activation function
 - **Cost functions** — mean squared error (MSE) and cross-entropy.
   Cross-entropy requires a `sigmoid` or `softmax` output activation, since
   that's the only pairing for which its gradient shortcut is mathematically
@@ -32,22 +35,22 @@ other numerical libraries required.
 
 ## Installation
 
-This project isn't published as a package yet. For now, clone the
-repository and import directly from the repo root:
+```bash
+pip install deepnode
+```
+
+If you're installing from a local clone instead:
 
 ```bash
 git clone https://github.com/<your-username>/Neural-Network.git
 cd Neural-Network
-```
-
-```python
-from network import NeuralNetwork
+pip install .
 ```
 
 ## Quick start
 
 ```python
-from network import NeuralNetwork
+from deepnode import NeuralNetwork
 
 # 2 inputs -> one hidden layer of 4 neurons -> 2 outputs
 network = NeuralNetwork(
@@ -85,12 +88,14 @@ loaded_network = NeuralNetwork.load("model.json")
 
 ## Project structure
 
-- `neuron.py` — the `Neuron` class: weights, bias, activation function, and
-  the per-neuron forward pass
-- `network.py` — the `NeuralNetwork` class: layer construction, forward
-  propagation, backpropagation, optimizers, and training
-- `digits/`, `iris/`, `testing/` — example training scripts against MNIST
-  digits, the Iris dataset, and synthetic data
+- `src/deepnode/neuron.py` — the `Neuron` class: weights, bias, activation
+  function, and the per-neuron forward pass
+- `src/deepnode/network.py` — the `NeuralNetwork` class: layer construction,
+  forward propagation, backpropagation, optimizers, and training
+- `tests/` — the pytest test suite: unit tests for `Neuron` and
+  `NeuralNetwork` construction, numerical gradient checking against every
+  optimizer's analytic gradients, per-optimizer correctness tests, training
+  edge cases, and save/load round trips
 
 ## Notes
 
@@ -101,6 +106,13 @@ loaded_network = NeuralNetwork.load("model.json")
 - Model files saved by earlier versions of `save()` (before architecture
   metadata was added) are not compatible with the current `load()` and will
   need to be regenerated.
+
+## Running the tests
+
+```bash
+pip install pytest
+pytest tests/
+```
 
 ## License
 
